@@ -342,7 +342,7 @@ class Lexer:
         self.cur_pos += 1
         cur_char = self.source[self.cur_pos]
         if cur_char == "o":
-            return "state_not1", "o", None
+            return "state_not0", "o", None
 
         return "start", "else", None
 
@@ -353,7 +353,7 @@ class Lexer:
         self.cur_pos += 1
         cur_char = self.source[self.cur_pos]
         if cur_char == "t":
-            return "state_not2", "t", None
+            return "state_not1", "t", None
 
         return "start", "else", None
 
@@ -375,7 +375,7 @@ class Lexer:
         self.cur_pos += 1
         cur_char = self.source[self.cur_pos]
         if cur_char == "r":
-            return "state_true1", "r", None
+            return "state_true0", "r", None
 
         return "start", "else", None
 
@@ -386,7 +386,7 @@ class Lexer:
         self.cur_pos += 1
         cur_char = self.source[self.cur_pos]
         if cur_char == "u":
-            return "state_true2", "u", None
+            return "state_true1", "u", None
 
         return "start", "else", None
 
@@ -397,7 +397,7 @@ class Lexer:
         self.cur_pos += 1
         cur_char = self.source[self.cur_pos]
         if cur_char == "e":
-            return "state_true3", "e", None
+            return "state_true2", "e", None
 
         return "start", "else", None
 
@@ -419,7 +419,7 @@ class Lexer:
         self.cur_pos += 1
         cur_char = self.source[self.cur_pos]
         if cur_char == "a":
-            return "state_false1", "a", None
+            return "state_false0", "a", None
 
         return "start", "else", None
 
@@ -430,7 +430,7 @@ class Lexer:
         self.cur_pos += 1
         cur_char = self.source[self.cur_pos]
         if cur_char == "l":
-            return "state_false2", "l", None
+            return "state_false1", "l", None
 
         return "start", "else", None
 
@@ -441,7 +441,7 @@ class Lexer:
         self.cur_pos += 1
         cur_char = self.source[self.cur_pos]
         if cur_char == "s":
-            return "state_false3", "s", None
+            return "state_false2", "s", None
 
         return "start", "else", None
 
