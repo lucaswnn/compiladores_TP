@@ -1,0 +1,643 @@
+import sys
+import enum
+
+
+class Token:
+    """
+    This class contains the definition of Tokens. A token has two fields: its
+    text and its kind. The "kind" of a token is a constant that identifies it
+    uniquely. See the TokenType to know the possible identifiers (if you want).
+    You don't need to change this class.
+    """
+
+    def __init__(self, tokenText, tokenKind):
+        # The token's actual text. Used for identifiers, strings, and numbers.
+        self.text = tokenText
+        # The TokenType that this token is classified as.
+        self.kind = tokenKind
+
+
+class TokenType(enum.Enum):
+    """
+    These are the possible tokens. You don't need to change this class at all.
+    """
+    EOF = -1  # End of file
+    NLN = 0   # New line
+    WSP = 1   # White Space
+    COM = 2   # Comment
+    STR = 3   # Strings
+    TRU = 4   # The constant true
+    FLS = 5   # The constant false
+    INT = 6   # Number (integers)
+    BIN = 7   # Number (binary)
+    OCT = 8   # Number (octal)
+    HEX = 9   # Number (hexadecimal)
+    EQL = 201
+    ADD = 202
+    SUB = 203
+    MUL = 204
+    DIV = 205
+    LEQ = 206
+    LTH = 207
+    NEG = 208
+    NOT = 209
+    LPR = 210
+    RPR = 211
+
+
+class Lexer:
+
+    def __init__(self, source):
+        """
+        The constructor of the lexer. It receives the string that shall be
+        scanned.
+        TODO: You will need to implement this method.
+        """
+        if source is None or source == "":
+            raise ValueError("Source cannot be None or empty")
+
+        self.source = source
+        self.cur_pos = 0
+        self.length = len(source)
+        self.buffer = ""
+        self.state_table = self.state_table()
+
+    def state_table(self):
+        return {
+            "start": {
+                "\n": self.state_NLN,
+                " ": self.state_WSP,
+                "=": self.state_EQL,
+                "+": self.state_ADD,
+                "*": self.state_MUL,
+                "/": self.state_DIV,
+                "~": self.state_NEG,
+                ")": self.state_RPR,
+                "-": self.state_single_comment0,
+                "(": self.state_left_parenthesis,
+                "<": self.state_less_eq,
+                "n": self.state_not0,
+                "t": self.state_true0,
+                "f": self.state_false0,
+                "0": self.state_zero,
+                "digit_not_zero": self.state_integer,
+                "else": self.state_error
+            },
+            "state_single_comment0": {
+                "-": self.state_single_comment1,
+                "else": self.state_SUB,
+            },
+            "state_single_comment1": {
+                "\n": self.state_single_COM,
+                "else": self.state_single_comment1,
+            },
+            "state_full_comment0": {
+                "*": self.state_full_comment1,
+                "else": self.state_full_comment0,
+            },
+            "state_full_comment1": {
+                ")": self.state_full_COM,
+                "*": self.state_full_comment1,
+                "else": self.state_full_comment0,
+            },
+            "state_left_parenthesis": {
+                "*": self.state_full_comment0,
+                "else": self.state_LPR,
+            },
+            "state_less_eq": {
+                "=": self.state_LEQ,
+                "else": self.state_LTH,
+            },
+            "state_not0": {
+                "o": self.state_not1,
+            },
+            "state_not1": {
+                "t": self.state_not2,
+            },
+            "state_not2": {
+                "else": self.state_NOT,
+            },
+            "state_true0": {
+                "r": self.state_true1,
+            },
+            "state_true1": {
+                "u": self.state_true2,
+            },
+            "state_true2": {
+                "e": self.state_true3,
+            },
+            "state_true3": {
+                "else": self.state_TRU,
+            },
+            "state_false0": {
+                "a": self.state_false1,
+            },
+            "state_false1": {
+                "l": self.state_false2,
+            },
+            "state_false2": {
+                "s": self.state_false3,
+            },
+            "state_false3": {
+                "e": self.state_false4,
+            },
+            "state_false4": {
+                "else": self.state_FLS,
+            },
+            "state_zero": {
+                "0-7": self.state_octal,
+                "x|X": self.state_hexadecimal,
+                "b|B": self.state_binary,
+                "else": self.state_INT,
+            },
+            "state_octal": {
+                "0-7": self.state_octal,
+                "else": self.state_OCT,
+            },
+            "state_hexadecimal": {
+                "0-9|a-f|A-F": self.state_hexadecimal,
+                "else": self.state_HEX,
+            },
+            "state_binary": {
+                "0|1": self.state_binary,
+                "else": self.state_BIN,
+            },
+            "state_integer": {
+                "0-9": self.state_integer,
+                "else": self.state_INT,
+            }
+        }
+
+    def state_NLN(self):
+        self.cur_pos += 1
+        return "start", None, Token("\n", TokenType.NLN)
+
+    def state_WSP(self):
+        self.cur_pos += 1
+        return "start", None, Token(" ", TokenType.WSP)
+
+    def state_EQL(self):
+        self.cur_pos += 1
+        return "start", None, Token("=", TokenType.EQL)
+
+    def state_ADD(self):
+        self.cur_pos += 1
+        return "start", None, Token("+", TokenType.ADD)
+
+    def state_SUB(self):
+        self.cur_pos += 1
+        return "start", None, Token("-", TokenType.SUB)
+
+    def state_MUL(self):
+        self.cur_pos += 1
+        return "start", None, Token("*", TokenType.MUL)
+
+    def state_DIV(self):
+        self.cur_pos += 1
+        return "start", None, Token("/", TokenType.DIV)
+
+    def state_NEG(self):
+        self.cur_pos += 1
+        return "start", None, Token("~", TokenType.NEG)
+
+    def state_LPR(self):
+        self.cur_pos += 1
+        return "start", None, Token("(", TokenType.LPR)
+
+    def state_RPR(self):
+        self.cur_pos += 1
+        return "start", None, Token(")", TokenType.RPR)
+
+    def state_single_COM(self):
+        self.cur_pos += 1
+        comment = f"--{self.buffer}"
+        self.buffer = ""
+        return "start", None, Token(comment, TokenType.COM)
+
+    def state_full_COM(self):
+        self.cur_pos += 1
+        comment = f"(*{self.buffer})"
+        self.buffer = ""
+        return "start", None, Token(comment, TokenType.COM)
+
+    def state_LEQ(self):
+        self.cur_pos += 1
+        return "start", None, Token("<=", TokenType.LEQ)
+
+    def state_LTH(self):
+        self.cur_pos += 1
+        return "start", None, Token("<", TokenType.LTH)
+
+    def state_NOT(self):
+        self.cur_pos += 1
+        return "start", None, Token("not", TokenType.NOT)
+
+    def state_TRU(self):
+        self.cur_pos += 1
+        return "start", None, Token("true", TokenType.TRU)
+
+    def state_FLS(self):
+        self.cur_pos += 1
+        return "start", None, Token("false", TokenType.FLS)
+
+    def state_INT(self):
+        self.cur_pos += 1
+        number = self.buffer
+        self.buffer = ""
+        return "start", None, Token(number, TokenType.INT)
+
+    def state_OCT(self):
+        self.cur_pos += 1
+        number = self.buffer
+        self.buffer = ""
+        return "start", None, Token(number, TokenType.OCT)
+
+    def state_HEX(self):
+        self.cur_pos += 1
+        number = self.buffer
+        self.buffer = ""
+        return "start", None, Token(number, TokenType.HEX)
+
+    def state_BIN(self):
+        self.cur_pos += 1
+        number = self.buffer
+        self.buffer = ""
+        return "start", None, Token(number, TokenType.BIN)
+
+    def state_single_comment0(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_single_comment0", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char == "-":
+            return "state_single_comment1", "else", None
+
+        self.cur_pos -= 1
+        return "state_single_comment0", "else", None
+
+    def state_single_comment1(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_single_comment1", "\n", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        self.buffer += cur_char
+        if cur_char == "\n":
+            self.cur_pos -= 1
+            return "state_single_comment1", "\n", None
+
+        return "state_single_comment1", "else", None
+
+    def state_left_parenthesis(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_left_parenthesis", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char == "*":
+            return "state_full_comment0", "else", None
+
+        self.cur_pos -= 1
+        return "state_left_parenthesis", "else", None
+
+    def state_full_comment0(self):
+        if self.cur_pos + 1 >= self.length:
+            return "start", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        self.buffer += cur_char
+        if cur_char == "*":
+            return "state_full_comment1", "*", None
+
+        return "state_full_comment0", "else", None
+
+    def state_full_comment1(self):
+        if self.cur_pos + 1 >= self.length:
+            return "start", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char == ")":
+            return "state_full_comment1", ")", None
+
+        self.buffer += cur_char
+        if cur_char == "*":
+            return "state_full_comment1", "*", None
+
+        return "state_full_comment1", "else", None
+
+    def state_less_eq(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_less_eq", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char == "=":
+            return "state_less_eq", "=", None
+
+        self.cur_pos -= 1
+        return "state_less_eq", "else", None
+
+    def state_not0(self):
+        if self.cur_pos + 1 >= self.length:
+            return "start", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char == "o":
+            return "state_not1", "o", None
+
+        return "start", "else", None
+
+    def state_not1(self):
+        if self.cur_pos + 1 >= self.length:
+            return "start", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char == "t":
+            return "state_not2", "t", None
+
+        return "start", "else", None
+
+    def state_not2(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_not2", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char.isspace() or cur_char == "(":
+            return "state_not2", "else", None
+
+        return "start", "else", None
+
+    def state_true0(self):
+        if self.cur_pos + 1 >= self.length:
+            return "start", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char == "r":
+            return "state_true1", "r", None
+
+        return "start", "else", None
+
+    def state_true1(self):
+        if self.cur_pos + 1 >= self.length:
+            return "start", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char == "u":
+            return "state_true2", "u", None
+
+        return "start", "else", None
+
+    def state_true2(self):
+        if self.cur_pos + 1 >= self.length:
+            return "start", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char == "e":
+            return "state_true3", "e", None
+
+        return "start", "else", None
+
+    def state_true3(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_true3", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char.isspace() or cur_char == "(":
+            return "state_true3", "else", None
+
+        return "start", "else", None
+
+    def state_false0(self):
+        if self.cur_pos + 1 >= self.length:
+            return "start", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char == "a":
+            return "state_false1", "a", None
+
+        return "start", "else", None
+
+    def state_false1(self):
+        if self.cur_pos + 1 >= self.length:
+            return "start", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char == "l":
+            return "state_false2", "l", None
+
+        return "start", "else", None
+
+    def state_false2(self):
+        if self.cur_pos + 1 >= self.length:
+            return "start", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char == "s":
+            return "state_false3", "s", None
+
+        return "start", "else", None
+
+    def state_false3(self):
+        if self.cur_pos + 1 >= self.length:
+            return "start", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char == "e":
+            return "state_false3", "e", None
+
+        return "start", "else", None
+
+    def state_false4(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_false4", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char.isspace() or cur_char == "(":
+            return "state_false4", "else", None
+
+        return "start", "else", None
+
+    def state_zero(self):
+        self.buffer = "0"
+        if self.cur_pos + 1 >= self.length:
+            return "state_zero", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+
+        if cur_char in "01234567":
+            self.buffer += cur_char
+            return "state_zero", "0-7", None
+        elif cur_char in "xX":
+            self.buffer += cur_char
+            return "state_zero", "x|X", None
+        elif cur_char in "bB":
+            self.buffer += cur_char
+            return "state_zero", "b|B", None
+        elif cur_char.isalpha():
+            return "start", "else", None
+
+        self.cur_pos -= 1
+        return "state_zero", "else", None
+
+    def state_octal(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_octal", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char in "01234567":
+            self.buffer += cur_char
+            return "state_octal", "0-7", None
+        if cur_char.isalpha():
+            return "start", "else", None
+
+        self.cur_pos -= 1
+        return "state_octal", "else", None
+
+    def state_hexadecimal(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_hexadecimal", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char in "0123456789abcdefABCDEF":
+            self.buffer += cur_char
+            return "state_hexadecimal", "0-9|a-f|A-F", None
+        if cur_char.isalpha():
+            return "start", "else", None
+
+        self.cur_pos -= 1
+        return "state_hexadecimal", "else", None
+
+    def state_binary(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_binary", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char in "01":
+            self.buffer += cur_char
+            return "state_binary", "0|1", None
+        if cur_char.isalpha():
+            return "start", "else", None
+
+        self.cur_pos -= 1
+        return "state_binary", "else", None
+
+    def state_integer(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_integer", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char.isdigit():
+            self.buffer += cur_char
+            return "state_integer", "0-9", None
+        if cur_char.isalpha():
+            return "start", "else", None
+
+        self.cur_pos -= 1
+        return "state_integer", "else", None
+
+    def dispatch(self, state, input_state=None):
+        if self.cur_pos >= self.length:
+            return None, None, Token("", TokenType.EOF)
+
+        cur_char = self.source[self.cur_pos]
+        if input_state is None:
+            if cur_char == "0":
+                action = self.state_table[state]["0"]
+            elif cur_char.isdigit():
+                self.buffer += cur_char
+                action = self.state_table[state]["digit_not_zero"]
+            elif cur_char in self.state_table[state]:
+                action = self.state_table[state][cur_char]
+            else:
+                action = self.state_error
+        else:
+            action = self.state_table[state][input_state]
+
+        return action()
+
+    def state_error(self):
+        raise ValueError(
+            f"Unexpected character '{self.source[self.cur_pos]}' at position {self.cur_pos}")
+
+    def tokens(self):
+        """
+        This method is a token generator: it converts the string encapsulated
+        into this object into a sequence of Tokens. Examples:
+
+        >>> l = Lexer("10")
+        >>> [tk.kind.name for tk in l.tokens()]
+        ['INT']
+
+        >>> l = Lexer("01")
+        >>> [tk.kind.name for tk in l.tokens()]
+        ['OCT']
+
+        >>> l = Lexer("0b1")
+        >>> [tk.kind.name for tk in l.tokens()]
+        ['BIN']
+
+        >>> l = Lexer("0B1")
+        >>> [tk.kind.name for tk in l.tokens()]
+        ['BIN']
+
+        >>> l = Lexer("0x1")
+        >>> [tk.kind.name for tk in l.tokens()]
+        ['HEX']
+
+        >>> l = Lexer("0X1")
+        >>> [tk.kind.name for tk in l.tokens()]
+        ['HEX']
+
+        >>> l = Lexer("0X1 + 0xA + 0XABCDEF + 0xA0B1C2D3E4F5")
+        >>> [tk.kind.name for tk in l.tokens()]
+        ['HEX', 'ADD', 'HEX', 'ADD', 'HEX', 'ADD', 'HEX']
+
+        >>> l = Lexer("0b1 + 0xA + 0B01010101 + 0xA0B1C2D3E4F5")
+        >>> [tk.kind.name for tk in l.tokens()]
+        ['BIN', 'ADD', 'HEX', 'ADD', 'BIN', 'ADD', 'HEX']
+
+        >>> l = Lexer('1 * 2 - 3')
+        >>> [tk.kind.name for tk in l.tokens()]
+        ['INT', 'MUL', 'INT', 'SUB', 'INT']
+
+        >>> l = Lexer('1 * 2 - 3 -- alkdjf adkjf dlkjf \\n')
+        >>> [tk.kind.name for tk in l.tokens()]
+        ['INT', 'MUL', 'INT', 'SUB', 'INT', 'COM']
+
+        >>> l = Lexer('1 * 2 - 3 -- alkdjf adkjf dlkjf \\n0x23 + 012')
+        >>> [tk.kind.name for tk in l.tokens()]
+        ['INT', 'MUL', 'INT', 'SUB', 'INT', 'COM', 'HEX', 'ADD', 'OCT']
+        """
+        token = self.getToken()
+        while token.kind != TokenType.EOF:
+            if token.kind != TokenType.WSP and token.kind != TokenType.NLN:
+                yield token
+            token = self.getToken()
+
+    def getToken(self):
+        state = 'start'
+        input_state = None
+        while state:
+            state, input_state, token = self.dispatch(state, input_state)
+            if token:
+                return token
