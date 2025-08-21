@@ -48,11 +48,6 @@ class TokenType(enum.Enum):
 class Lexer:
 
     def __init__(self, source):
-        """
-        The constructor of the lexer. It receives the string that shall be
-        scanned.
-        TODO: You will need to implement this method.
-        """
         if source is None or source == "":
             raise ValueError("Source cannot be None or empty")
 
