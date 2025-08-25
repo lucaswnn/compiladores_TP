@@ -20,8 +20,7 @@ class Bln(Expression):
         >>> e.eval()
         True
         """
-        # TODO: Implement this method!
-        return None
+        return True if self.bln else False
 
 class Num(Expression):
     """
@@ -37,8 +36,7 @@ class Num(Expression):
         >>> e.eval()
         3
         """
-        # TODO: Implement this method!
-        return None
+        return self.num
 
 class BinaryExpression(Expression):
     """
@@ -74,8 +72,7 @@ class Eql(BinaryExpression):
         >>> e.eval()
         True
         """
-        # TODO: Implement this method!
-        return None
+        return self.left.eval() == self.right.eval()
 
 class Add(BinaryExpression):
     """
@@ -91,8 +88,7 @@ class Add(BinaryExpression):
         >>> e.eval()
         7
         """
-        # TODO: Implement this method!
-        return None
+        return self.left.eval() + self.right.eval()
 
 class Sub(BinaryExpression):
     """
@@ -108,8 +104,7 @@ class Sub(BinaryExpression):
         >>> e.eval()
         -1
         """
-        # TODO: Implement this method!
-        return None
+        return self.left.eval() - self.right.eval()
 
 class Mul(BinaryExpression):
     """
@@ -125,8 +120,7 @@ class Mul(BinaryExpression):
         >>> e.eval()
         12
         """
-        # TODO: Implement this method!
-        return None
+        return self.left.eval() * self.right.eval()
 
 class Div(BinaryExpression):
     """
@@ -148,8 +142,7 @@ class Div(BinaryExpression):
         >>> e.eval()
         5
         """
-        # TODO: Implement this method!
-        return None
+        return self.left.eval() // self.right.eval()
 
 class Leq(BinaryExpression):
     """
@@ -177,8 +170,7 @@ class Leq(BinaryExpression):
         >>> e.eval()
         False
         """
-        # TODO: Implement this method!
-        return None
+        return self.left.eval() <= self.right.eval()
 
 class Lth(BinaryExpression):
     """
@@ -206,8 +198,7 @@ class Lth(BinaryExpression):
         >>> e.eval()
         False
         """
-        # TODO: Implement this method!
-        return None
+        return self.left.eval() < self.right.eval()
 
 class UnaryExpression(Expression):
     """
@@ -238,8 +229,7 @@ class Neg(UnaryExpression):
         >>> e.eval()
         0
         """
-        # TODO: Implement this method!
-        return None
+        return -self.exp.eval()
 
 class Not(UnaryExpression):
     """
@@ -258,5 +248,4 @@ class Not(UnaryExpression):
         >>> e.eval()
         True
         """
-        # TODO: Implement this method!
-        return None
+        return not self.exp.eval()
