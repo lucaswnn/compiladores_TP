@@ -1,5 +1,5 @@
 import sys
-from Lexer import *
+from Expression import *
 
 if __name__ == "__main__":
     """
@@ -7,6 +7,5 @@ if __name__ == "__main__":
     VPL. O arquivo contem o codigo que testa a implementacao do analisador
     lexico.
     """
-    lexer = Lexer(sys.stdin.read())
-    for token in lexer.tokens():
-        print(f"{token.kind.name}")
+    e = eval(sys.stdin.read())
+    print(f"Value is {e.eval()}")
