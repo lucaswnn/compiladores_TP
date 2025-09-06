@@ -234,7 +234,7 @@ class Parser:
         
         elif token.kind == TokenType.NEG:
             self.consumeToken(TokenType.NEG)
-            node = self.Exp()
+            node = self.F()
             return Neg(node)
         
         elif token.kind == TokenType.LPR: # '('

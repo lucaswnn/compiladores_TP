@@ -1,0 +1,27 @@
+Exp ::= Not
+
+Not ::= not B
+| B
+
+B ::= P Bool
+
+Bool ::= '==' P Bool
+| '<=' P Bool
+| '<' P Bool
+| empty
+
+P ::= M Plus
+
+Plus ::= '+' M Plus
+| '-' M Plus
+| empty
+
+M ::= F Mul
+
+Mul ::= '*' F Mul
+| '/' F Mul
+| empty
+
+F ::= num | True | False
+| '~' F
+| '(' Exp ')'
