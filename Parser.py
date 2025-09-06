@@ -18,6 +18,22 @@ class Parser:
         """
         self.tokens = list(tokens)
         self.cur_token_idx = 0 # This is just a suggestion!
+    
+    def consumeToken(self, token_type):
+        if self.current_token.kind == token_type:
+            if self.cur_token_idx < len(self.tokens) - 1:
+                self.cur_token_idx += 1
+            else:
+                self.cur_token_idx = -1
+        else:
+            raise ValueError(f"Unexpected token: {self.current_token.kind}")
+    
+    @property
+    def current_token(self):
+        if self.cur_token_idx == -1:
+            return Token('eof', TokenType.EOF)
+        
+        return self.tokens[self.cur_token_idx]
 
     def parse(self):
         """
@@ -132,4 +148,98 @@ class Parser:
         >>> exp.eval()
         True
         """
-        return None
+
+        return self.Exp()
+    
+    def Exp(self):
+        return self.Not()
+    
+    def Not(self):
+        token = self.current_token
+        if token.kind == TokenType.NOT:
+            self.consumeToken(TokenType.NOT)
+            exp = self.B()
+            return Not(exp)
+        
+        return self.B()
+    
+    def B(self):
+        exp = self.P()
+        return self.Bool(exp)
+    
+    def Bool(self, left):
+        token = self.current_token
+        if token.kind == TokenType.EQL:
+            self.consumeToken(TokenType.EQL)
+            right = self.P()
+            return self.Bool(Eql(left, right))
+        elif token.kind == TokenType.LEQ:
+            self.consumeToken(TokenType.LEQ)
+            right = self.P()
+            return self.Bool(Leq(left, right))
+        elif token.kind == TokenType.LTH:
+            self.consumeToken(TokenType.LTH)
+            right = self.P()
+            return self.Bool(Lth(left, right))
+        
+        return left
+    
+    def P(self):
+        exp = self.M()
+        return self.Plus(exp)
+    
+    def Plus(self, left):
+        token = self.current_token
+        if token.kind == TokenType.ADD:
+            self.consumeToken(TokenType.ADD)
+            right = self.M()
+            return self.Plus(Add(left, right))
+        elif token.kind == TokenType.SUB:
+            self.consumeToken(TokenType.SUB)
+            right = self.M()
+            return self.Plus(Sub(left, right))
+        
+        return left
+    
+    def M(self):
+        exp = self.F()
+        return self.Mul(exp)
+    
+    def Mul(self, left):
+        token = self.current_token
+        if token.kind == TokenType.MUL:
+            self.consumeToken(TokenType.MUL)
+            right = self.F()
+            return self.Mul(Mul(left, right))
+        elif token.kind == TokenType.DIV:
+            self.consumeToken(TokenType.DIV)
+            right = self.F()
+            return self.Mul(Div(left, right))
+        
+        return left
+    
+    def F(self):
+        token = self.current_token
+        if token.kind == TokenType.NUM:
+            self.consumeToken(TokenType.NUM)
+            return Num(int(token.text))
+        
+        elif token.kind == TokenType.TRU:
+            self.consumeToken(TokenType.TRU)
+            return Bln(True)
+        
+        elif token.kind == TokenType.FLS:
+            self.consumeToken(TokenType.FLS)
+            return Bln(False)
+        
+        elif token.kind == TokenType.NEG:
+            self.consumeToken(TokenType.NEG)
+            node = self.Exp()
+            return Neg(node)
+        
+        elif token.kind == TokenType.LPR: # '('
+            self.consumeToken(TokenType.LPR)
+            node = self.Exp()
+            self.consumeToken(TokenType.RPR) # ')'
+            return node
+        
