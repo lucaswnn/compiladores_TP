@@ -25,13 +25,10 @@ class TokenType(enum.Enum):
     NLN = 0   # New line
     WSP = 1   # White Space
     COM = 2   # Comment
-    STR = 3   # Strings
-    TRU = 4   # The constant true
-    FLS = 5   # The constant false
-    INT = 6   # Number (integers)
-    BIN = 7   # Number (binary)
-    OCT = 8   # Number (octal)
-    HEX = 9   # Number (hexadecimal)
+    NUM = 3   # Number (integers)
+    STR = 4   # Strings
+    TRU = 5   # The constant true
+    FLS = 6   # The constant false
     EQL = 201
     ADD = 202
     SUB = 203
@@ -239,7 +236,7 @@ class Lexer:
         self.cur_pos += 1
         number = self.buffer
         self.buffer = ""
-        return "start", None, Token(number, TokenType.INT)
+        return "start", None, Token(number, TokenType.NUM)
 
     def state_OCT(self):
         self.cur_pos += 1
@@ -579,53 +576,17 @@ class Lexer:
         This method is a token generator: it converts the string encapsulated
         into this object into a sequence of Tokens. Examples:
 
-        >>> l = Lexer("10")
-        >>> [tk.kind.name for tk in l.tokens()]
-        ['INT']
-
-        >>> l = Lexer("01")
-        >>> [tk.kind.name for tk in l.tokens()]
-        ['OCT']
-
-        >>> l = Lexer("0b1")
-        >>> [tk.kind.name for tk in l.tokens()]
-        ['BIN']
-
-        >>> l = Lexer("0B1")
-        >>> [tk.kind.name for tk in l.tokens()]
-        ['BIN']
-
-        >>> l = Lexer("0x1")
-        >>> [tk.kind.name for tk in l.tokens()]
-        ['HEX']
-
-        >>> l = Lexer("0X1")
-        >>> [tk.kind.name for tk in l.tokens()]
-        ['HEX']
-
-        >>> l = Lexer("0X1 + 0xA + 0XABCDEF + 0xA0B1C2D3E4F5")
-        >>> [tk.kind.name for tk in l.tokens()]
-        ['HEX', 'ADD', 'HEX', 'ADD', 'HEX', 'ADD', 'HEX']
-
-        >>> l = Lexer("0b1 + 0xA + 0B01010101 + 0xA0B1C2D3E4F5")
-        >>> [tk.kind.name for tk in l.tokens()]
-        ['BIN', 'ADD', 'HEX', 'ADD', 'BIN', 'ADD', 'HEX']
-
         >>> l = Lexer('1 * 2 - 3')
-        >>> [tk.kind.name for tk in l.tokens()]
-        ['INT', 'MUL', 'INT', 'SUB', 'INT']
+        >>> [tk.kind for tk in l.tokens()]
+        [<TokenType.NUM: 3>, <TokenType.ADD: 202>, <TokenType.NUM: 3>]
 
-        >>> l = Lexer('1 * 2 - 3 -- alkdjf adkjf dlkjf \\n')
-        >>> [tk.kind.name for tk in l.tokens()]
-        ['INT', 'MUL', 'INT', 'SUB', 'INT', 'COM']
-
-        >>> l = Lexer('1 * 2 - 3 -- alkdjf adkjf dlkjf \\n0x23 + 012')
-        >>> [tk.kind.name for tk in l.tokens()]
-        ['INT', 'MUL', 'INT', 'SUB', 'INT', 'COM', 'HEX', 'ADD', 'OCT']
+        >>> l = Lexer('1 * 2 -- 3\\n')
+        >>> [tk.kind for tk in l.tokens()]
+        [<TokenType.NUM: 3>, <TokenType.MUL: 204>, <TokenType.NUM: 3>]
         """
         token = self.getToken()
         while token.kind != TokenType.EOF:
-            if token.kind != TokenType.WSP and token.kind != TokenType.NLN:
+            if token.kind != TokenType.WSP and token.kind != TokenType.COM:
                 yield token
             token = self.getToken()
 
