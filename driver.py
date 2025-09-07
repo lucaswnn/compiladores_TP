@@ -11,4 +11,4 @@ if __name__ == "__main__":
     lexer = Lexer(sys.stdin.read())
     parser = Parser(lexer.tokens())
     exp = parser.parse()
-    print(f"Value is {exp.eval()}")
+    print(f"Value is {exp.eval({})}")

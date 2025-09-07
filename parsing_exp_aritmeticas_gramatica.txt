@@ -22,6 +22,7 @@ Mul ::= '*' F Mul
 | '/' F Mul
 | empty
 
-F ::= num | True | False
+F ::= num | True | False | var
 | '~' F
 | '(' Exp ')'
+| let name <- Exp in Exp end

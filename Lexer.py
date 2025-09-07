@@ -16,6 +16,9 @@ class Token:
         # The TokenType that this token is classified as.
         self.kind = tokenKind
 
+    def __repr__(self):
+        return self.text
+
 
 class TokenType(enum.Enum):
     """
@@ -29,6 +32,10 @@ class TokenType(enum.Enum):
     STR = 4   # Strings
     TRU = 5   # The constant true
     FLS = 6   # The constant false
+    VAR = 7   # An identifier
+    LET = 8   # The 'let' of the let expression
+    INX = 9   # The 'in' of the let expression
+    END = 10  # The 'end' of the let expression
     EQL = 201
     ADD = 202
     SUB = 203
@@ -40,9 +47,12 @@ class TokenType(enum.Enum):
     NOT = 209
     LPR = 210
     RPR = 211
+    ASN = 212  # The assignment '<-' operator
 
 
 class Lexer:
+
+    var_characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
 
     def __init__(self, source):
         if source is None or source == "":
@@ -67,13 +77,49 @@ class Lexer:
                 ")": self.state_RPR,
                 "-": self.state_single_comment0,
                 "(": self.state_left_parenthesis,
-                "<": self.state_less_eq,
+                "<": self.state_less_eq_or_assign,
                 "n": self.state_not0,
                 "t": self.state_true0,
                 "f": self.state_false0,
+                "l": self.state_let0,
+                "e": self.state_end0,
+                "i": self.state_in0,
                 "0": self.state_zero,
                 "digit_not_zero": self.state_integer,
+                "alpha": self.state_variable,
                 "else": self.state_error
+            },
+            "state_let0": {
+                "e": self.state_let1,
+                "var": self.state_variable,
+            },
+            "state_let1": {
+                "t": self.state_let2,
+                "var": self.state_variable,
+            },
+            "state_let2": {
+                "var": self.state_variable,
+                "else": self.state_LET,
+            },
+            "state_end0": {
+                "n": self.state_end1,
+                "var": self.state_variable,
+            },
+            "state_end1": {
+                "d": self.state_end2,
+                "var": self.state_variable,
+            },
+            "state_end2": {
+                "var": self.state_variable,
+                "else": self.state_END,
+            },
+            "state_in0": {
+                "n": self.state_in1,
+                "var": self.state_variable,
+            },
+            "state_in1": {
+                "var": self.state_variable,
+                "else": self.state_IN,
             },
             "state_single_comment0": {
                 "-": self.state_single_comment1,
@@ -98,42 +144,55 @@ class Lexer:
             },
             "state_less_eq": {
                 "=": self.state_LEQ,
+                "-": self.state_ASN,
                 "else": self.state_LTH,
             },
             "state_not0": {
                 "o": self.state_not1,
+                "var": self.state_variable,
             },
             "state_not1": {
                 "t": self.state_not2,
+                "var": self.state_variable,
             },
             "state_not2": {
+                "var": self.state_variable,
                 "else": self.state_NOT,
             },
             "state_true0": {
                 "r": self.state_true1,
+                "var": self.state_variable,
             },
             "state_true1": {
                 "u": self.state_true2,
+                "var": self.state_variable,
             },
             "state_true2": {
                 "e": self.state_true3,
+                "var": self.state_variable,
             },
             "state_true3": {
+                "var": self.state_variable,
                 "else": self.state_TRU,
             },
             "state_false0": {
                 "a": self.state_false1,
+                "var": self.state_variable,
             },
             "state_false1": {
                 "l": self.state_false2,
+                "var": self.state_variable,
             },
             "state_false2": {
                 "s": self.state_false3,
+                "var": self.state_variable,
             },
             "state_false3": {
                 "e": self.state_false4,
+                "var": self.state_variable,
             },
             "state_false4": {
+                "var": self.state_variable,
                 "else": self.state_FLS,
             },
             "state_zero": {
@@ -157,6 +216,10 @@ class Lexer:
             "state_integer": {
                 "0-9": self.state_integer,
                 "else": self.state_INT,
+            },
+            "state_variable": {
+                "var_characters": self.state_variable,
+                "else": self.state_VAR,
             }
         }
 
@@ -220,6 +283,18 @@ class Lexer:
         self.cur_pos += 1
         return "start", None, Token("<", TokenType.LTH)
 
+    def state_LET(self):
+        self.cur_pos += 1
+        return "start", None, Token("let", TokenType.LET)
+
+    def state_END(self):
+        self.cur_pos += 1
+        return "start", None, Token("end", TokenType.END)
+
+    def state_IN(self):
+        self.cur_pos += 1
+        return "start", None, Token("in", TokenType.INX)
+
     def state_NOT(self):
         self.cur_pos += 1
         return "start", None, Token("not", TokenType.NOT)
@@ -255,6 +330,16 @@ class Lexer:
         number = self.buffer
         self.buffer = ""
         return "start", None, Token(number, TokenType.BIN)
+
+    def state_VAR(self):
+        self.cur_pos += 1
+        var = self.buffer
+        self.buffer = ""
+        return "start", None, Token(var, TokenType.VAR)
+
+    def state_ASN(self):
+        self.cur_pos += 1
+        return "start", None, Token("<-", TokenType.ASN)
 
     def state_single_comment0(self):
         if self.cur_pos + 1 >= self.length:
@@ -320,7 +405,7 @@ class Lexer:
 
         return "state_full_comment1", "else", None
 
-    def state_less_eq(self):
+    def state_less_eq_or_assign(self):
         if self.cur_pos + 1 >= self.length:
             return "state_less_eq", "else", None
 
@@ -328,9 +413,123 @@ class Lexer:
         cur_char = self.source[self.cur_pos]
         if cur_char == "=":
             return "state_less_eq", "=", None
+        if cur_char == "-":
+            return "state_less_eq", "-", None
 
         self.cur_pos -= 1
         return "state_less_eq", "else", None
+
+    def state_let0(self):
+        if self.cur_pos + 1 >= self.length:
+            return "start", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char == "e":
+            return "state_let0", "e", None
+
+        if cur_char in Lexer.var_characters:
+            return "state_let0", "var", None
+
+        return "start", "else", None
+
+    def state_let1(self):
+        if self.cur_pos + 1 >= self.length:
+            return "start", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char == "t":
+            return "state_let1", "t", None
+
+        if cur_char in Lexer.var_characters:
+            return "state_let1", "var", None
+
+        return "start", "else", None
+
+    def state_let2(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_let2", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char.isspace() or cur_char == "(":
+            return "state_let2", "else", None
+
+        if cur_char in Lexer.var_characters:
+            return "state_let2", "var", None
+
+        return "start", "else", None
+
+    def state_end0(self):
+        if self.cur_pos + 1 >= self.length:
+            return "start", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char == "n":
+            return "state_end0", "n", None
+
+        if cur_char in Lexer.var_characters:
+            return "state_end0", "var", None
+
+        return "start", "else", None
+
+    def state_end1(self):
+        if self.cur_pos + 1 >= self.length:
+            return "start", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char == "d":
+            return "state_end1", "d", None
+
+        if cur_char in Lexer.var_characters:
+            return "state_end1", "var", None
+
+        return "start", "else", None
+
+    def state_end2(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_end2", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char.isspace() or cur_char == "(":
+            return "state_end2", "else", None
+
+        if cur_char in Lexer.var_characters:
+            return "state_end2", "var", None
+
+        return "start", "else", None
+
+    def state_in0(self):
+        if self.cur_pos + 1 >= self.length:
+            return "start", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char == "n":
+            return "state_in0", "n", None
+
+        if cur_char in Lexer.var_characters:
+            return "state_in0", "var", None
+
+        return "start", "else", None
+
+    def state_in1(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_in1", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char.isspace() or cur_char == "(":
+            return "state_in1", "else", None
+
+        if cur_char in Lexer.var_characters:
+            return "state_in1", "var", None
+
+        return "start", "else", None
 
     def state_not0(self):
         if self.cur_pos + 1 >= self.length:
@@ -404,7 +603,8 @@ class Lexer:
 
         self.cur_pos += 1
         cur_char = self.source[self.cur_pos]
-        if cur_char.isspace() or cur_char == "(":
+        if cur_char.isspace() or cur_char in "()":
+            self.cur_pos -= 1
             return "state_true3", "else", None
 
         return "start", "else", None
@@ -459,7 +659,8 @@ class Lexer:
 
         self.cur_pos += 1
         cur_char = self.source[self.cur_pos]
-        if cur_char.isspace() or cur_char == "(":
+        if cur_char.isspace() or cur_char in "()":
+            self.cur_pos -= 1
             return "state_false4", "else", None
 
         return "start", "else", None
@@ -547,6 +748,21 @@ class Lexer:
         self.cur_pos -= 1
         return "state_integer", "else", None
 
+    def state_variable(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_variable", "else", None
+
+        cur_char = self.source[self.cur_pos]
+        self.cur_pos += 1
+        if cur_char in Lexer.var_characters:
+            self.buffer += cur_char
+            return "state_variable", "var_characters", None
+        if not (cur_char.isspace() or cur_char == ')'):
+            return "start", "else", None
+
+        self.cur_pos -= 2
+        return "state_variable", "else", None
+
     def dispatch(self, state, input_state=None):
         if self.cur_pos >= self.length:
             return None, None, Token("", TokenType.EOF)
@@ -560,6 +776,8 @@ class Lexer:
                 action = self.state_table[state]["digit_not_zero"]
             elif cur_char in self.state_table[state]:
                 action = self.state_table[state][cur_char]
+            elif cur_char.isalpha():
+                action = self.state_table[state]["alpha"]
             else:
                 action = self.state_error
         else:
@@ -576,17 +794,29 @@ class Lexer:
         This method is a token generator: it converts the string encapsulated
         into this object into a sequence of Tokens. Examples:
 
-        >>> l = Lexer('1 * 2 - 3')
+        >>> l = Lexer("1 + 3")
         >>> [tk.kind for tk in l.tokens()]
         [<TokenType.NUM: 3>, <TokenType.ADD: 202>, <TokenType.NUM: 3>]
 
         >>> l = Lexer('1 * 2 -- 3\\n')
         >>> [tk.kind for tk in l.tokens()]
         [<TokenType.NUM: 3>, <TokenType.MUL: 204>, <TokenType.NUM: 3>]
+
+        >>> l = Lexer("1 + var")
+        >>> [tk.kind for tk in l.tokens()]
+        [<TokenType.NUM: 3>, <TokenType.ADD: 202>, <TokenType.VAR: 7>]
+
+        >>> l = Lexer("let v <- 2 in v end")
+        >>> [tk.kind.name for tk in l.tokens()]
+        ['LET', 'VAR', 'ASN', 'NUM', 'INX', 'VAR', 'END']
         """
         token = self.getToken()
         while token.kind != TokenType.EOF:
-            if token.kind != TokenType.WSP and token.kind != TokenType.COM:
+            if (
+                token.kind != TokenType.WSP
+                and token.kind != TokenType.COM
+                and token.kind != TokenType.NLN
+            ):
                 yield token
             token = self.getToken()
 
