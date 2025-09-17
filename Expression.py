@@ -1,18 +1,22 @@
 from abc import ABC, abstractmethod
 from Visitor import *
 
+
 class Expression(ABC):
     @abstractmethod
     def accept(self, visitor, arg):
         raise NotImplementedError
+
 
 class Var(Expression):
     """
     This class represents expressions that are identifiers. The value of an
     indentifier is the value associated with it in the environment table.
     """
+
     def __init__(self, identifier):
         self.identifier = identifier
+
     def accept(self, visitor, arg):
         """
         Example:
@@ -28,14 +32,17 @@ class Var(Expression):
         """
         return visitor.visit_var(self, arg)
 
+
 class Bln(Expression):
     """
     This class represents expressions that are boolean values. There are only
     two boolean values: true and false. The acceptuation of such an expression is
     the boolean itself.
     """
+
     def __init__(self, bln):
         self.bln = bln
+
     def accept(self, visitor, arg):
         """
         Example:
@@ -46,13 +53,16 @@ class Bln(Expression):
         """
         return visitor.visit_bln(self, arg)
 
+
 class Num(Expression):
     """
     This class represents expressions that are numbers. The acceptuation of such
     an expression is the number itself.
     """
+
     def __init__(self, num):
         self.num = num
+
     def accept(self, visitor, arg):
         """
         Example:
@@ -63,11 +73,13 @@ class Num(Expression):
         """
         return visitor.visit_num(self, arg)
 
+
 class BinaryExpression(Expression):
     """
     This class represents binary expressions. A binary expression has two
     sub-expressions: the left operand and the right operand.
     """
+
     def __init__(self, left, right):
         self.left = left
         self.right = right
@@ -76,12 +88,14 @@ class BinaryExpression(Expression):
     def accept(self, visitor, arg):
         raise NotImplementedError
 
+
 class Eql(BinaryExpression):
     """
     This class represents the equality between two expressions. The acceptuation
     of such an expression is True if the subexpressions are the same, or false
     otherwise.
     """
+
     def accept(self, visitor, arg):
         """
         Example:
@@ -101,11 +115,13 @@ class Eql(BinaryExpression):
         """
         return visitor.visit_eql(self, arg)
 
+
 class Add(BinaryExpression):
     """
     This class represents addition of two expressions. The acceptuation of such
     an expression is the addition of the two subexpression's values.
     """
+
     def accept(self, visitor, arg):
         """
         Example:
@@ -118,11 +134,13 @@ class Add(BinaryExpression):
         """
         return visitor.visit_add(self, arg)
 
+
 class Sub(BinaryExpression):
     """
     This class represents subtraction of two expressions. The acceptuation of such
     an expression is the subtraction of the two subexpression's values.
     """
+
     def accept(self, visitor, arg):
         """
         Example:
@@ -135,11 +153,13 @@ class Sub(BinaryExpression):
         """
         return visitor.visit_sub(self, arg)
 
+
 class Mul(BinaryExpression):
     """
     This class represents multiplication of two expressions. The acceptuation of
     such an expression is the product of the two subexpression's values.
     """
+
     def accept(self, visitor, arg):
         """
         Example:
@@ -152,12 +172,14 @@ class Mul(BinaryExpression):
         """
         return visitor.visit_mul(self, arg)
 
+
 class Div(BinaryExpression):
     """
     This class represents the integer division of two expressions. The
     acceptuation of such an expression is the integer quocient of the two
     subexpression's values.
     """
+
     def accept(self, visitor, arg):
         """
         Example:
@@ -176,6 +198,7 @@ class Div(BinaryExpression):
         """
         return visitor.visit_div(self, arg)
 
+
 class Leq(BinaryExpression):
     """
     This class represents comparison of two expressions using the
@@ -183,6 +206,7 @@ class Leq(BinaryExpression):
     boolean value that is true if the left operand is less than or equal the
     right operand. It is false otherwise.
     """
+
     def accept(self, visitor, arg):
         """
         Example:
@@ -207,6 +231,7 @@ class Leq(BinaryExpression):
         """
         return visitor.visit_leq(self, arg)
 
+
 class Lth(BinaryExpression):
     """
     This class represents comparison of two expressions using the
@@ -214,6 +239,7 @@ class Lth(BinaryExpression):
     boolean value that is true if the left operand is less than the right
     operand. It is false otherwise.
     """
+
     def accept(self, visitor, arg):
         """
         Example:
@@ -238,11 +264,13 @@ class Lth(BinaryExpression):
         """
         return visitor.visit_lth(self, arg)
 
+
 class UnaryExpression(Expression):
     """
     This class represents unary expressions. A unary expression has only one
     sub-expression.
     """
+
     def __init__(self, exp):
         self.exp = exp
 
@@ -250,11 +278,13 @@ class UnaryExpression(Expression):
     def accept(self, visitor, arg):
         raise NotImplementedError
 
+
 class Neg(UnaryExpression):
     """
     This expression represents the additive inverse of a number. The additive
     inverse of a number n is the number -n, so that the sum of both is zero.
     """
+
     def accept(self, visitor, arg):
         """
         Example:
@@ -271,11 +301,13 @@ class Neg(UnaryExpression):
         """
         return visitor.visit_neg(self, arg)
 
+
 class Not(UnaryExpression):
     """
     This expression represents the negation of a boolean. The negation of a
     boolean expression is the logical complement of that expression.
     """
+
     def accept(self, visitor, arg):
         """
         Example:
@@ -292,6 +324,7 @@ class Not(UnaryExpression):
         """
         return visitor.visit_not(self, arg)
 
+
 class Let(Expression):
     """
     This class represents a let expression. The semantics of a let expression,
@@ -299,10 +332,12 @@ class Let(Expression):
     1. Evaluate e0 in the environment env, yielding e0_val
     2. Evaluate e1 in the new environment env' = env + {v:e0_val}
     """
+
     def __init__(self, identifier, exp_def, exp_body):
         self.identifier = identifier
         self.exp_def = exp_def
         self.exp_body = exp_body
+
     def accept(self, visitor, arg):
         """
         Example:

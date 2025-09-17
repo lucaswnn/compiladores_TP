@@ -9,10 +9,8 @@ if __name__ == "__main__":
     Este arquivo nao deve ser alterado, mas deve ser enviado para resolver o
     VPL. O arquivo contem o codigo que testa a implementacao do parser.
     """
-    #text = sys.stdin.read()
-    #(option, rest) = text.split(maxsplit=1)
-    option = 'eval'
-    rest = '1 + let x <- 1 in x * x end + x'
+    text = sys.stdin.read()
+    (option, rest) = text.split(maxsplit=1)
     lexer = Lexer(rest)
     tokens = [token for token in lexer.tokens()]
     parser = Parser(tokens)
