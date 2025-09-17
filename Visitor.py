@@ -233,10 +233,3 @@ def safe_eval(exp):
     else:
         evalVisitor = EvalVisitor()
         print(f"Value is {exp.accept(evalVisitor, {})}")
-
-
-if __name__ == "__main__":
-    e0 = Add(Let('y', Num(3), Var('y')), Var('x'))
-    v = UseDefVisitor()
-    x = e0.accept(v, {})
-    print(x)
