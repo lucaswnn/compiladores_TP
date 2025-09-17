@@ -2,6 +2,7 @@ import sys
 from abc import ABC, abstractmethod
 from Expression import *
 
+
 class Visitor(ABC):
     """
     The visitor pattern consists of two abstract classes: the Expression and the
@@ -63,6 +64,7 @@ class Visitor(ABC):
     def visit_let(self, exp, arg):
         pass
 
+
 class EvalVisitor(Visitor):
     """
     The EvalVisitor class evaluates logical and arithmetic expressions. The
@@ -83,57 +85,52 @@ class EvalVisitor(Visitor):
     >>> e1.accept(ev, {'x': 41})
     True
     """
+
     def visit_var(self, exp, env):
-        # TODO: Implement this method!
-        raise NotImplementedError
+        if exp.identifier in env:
+            return env[exp.identifier]
+
+        sys.exit(f"Variavel inexistente {exp.identifier}.")
 
     def visit_bln(self, exp, env):
-        # TODO: Implement this method!
-        raise NotImplementedError
+        return exp.bln
 
     def visit_num(self, exp, env):
-        # TODO: Implement this method!
-        raise NotImplementedError
+        return exp.num
 
     def visit_eql(self, exp, env):
-        # TODO: Implement this method!
-        raise NotImplementedError
+        return exp.left.accept(self, env) == exp.right.accept(self, env)
 
     def visit_add(self, exp, env):
-        # TODO: Implement this method!
-        raise NotImplementedError
+        return exp.left.accept(self, env) + exp.right.accept(self, env)
 
     def visit_sub(self, exp, env):
-        # TODO: Implement this method!
-        raise NotImplementedError
+        return exp.left.accept(self, env) - exp.right.accept(self, env)
 
     def visit_mul(self, exp, env):
-        # TODO: Implement this method!
-        raise NotImplementedError
+        return exp.left.accept(self, env) * exp.right.accept(self, env)
 
     def visit_div(self, exp, env):
-        # TODO: Implement this method!
-        raise NotImplementedError
+        return exp.left.accept(self, env) // exp.right.accept(self, env)
 
     def visit_leq(self, exp, env):
-        # TODO: Implement this method!
-        raise NotImplementedError
+        return exp.left.accept(self, env) <= exp.right.accept(self, env)
 
     def visit_lth(self, exp, env):
-        # TODO: Implement this method!
-        raise NotImplementedError
+        return exp.left.accept(self, env) < exp.right.accept(self, env)
 
     def visit_neg(self, exp, env):
-        # TODO: Implement this method!
-        raise NotImplementedError
+        return -exp.exp.accept(self, env)
 
     def visit_not(self, exp, env):
-        # TODO: Implement this method!
-        raise NotImplementedError
+        return not exp.exp.accept(self, env)
 
     def visit_let(self, exp, env):
-        # TODO: Implement this method!
-        raise NotImplementedError
+        e0_val = exp.exp_def.accept(self, env)
+        new_env = dict(env)
+        new_env[exp.identifier] = e0_val
+        return exp.exp_body.accept(self, new_env)
+
 
 class UseDefVisitor(Visitor):
     """
@@ -165,7 +162,52 @@ class UseDefVisitor(Visitor):
     >>> len(e0.accept(ev, set()))
     0
     """
-    # TODO: Implement all the 13 methods of the visitor.
+
+    def visit_var(self, exp, env):
+        if exp.identifier in env:
+            return set()
+
+        return set({exp.identifier})
+
+    def visit_bln(self, exp, env):
+        return set()
+
+    def visit_num(self, exp, env):
+        return set()
+
+    def visit_eql(self, exp, env):
+        return exp.left.accept(self, env) | exp.right.accept(self, env)
+
+    def visit_add(self, exp, env):
+        return exp.left.accept(self, env) | exp.right.accept(self, env)
+
+    def visit_sub(self, exp, env):
+        return exp.left.accept(self, env) | exp.right.accept(self, env)
+
+    def visit_mul(self, exp, env):
+        return exp.left.accept(self, env) | exp.right.accept(self, env)
+
+    def visit_div(self, exp, env):
+        return exp.left.accept(self, env) | exp.right.accept(self, env)
+
+    def visit_leq(self, exp, env):
+        return exp.left.accept(self, env) | exp.right.accept(self, env)
+
+    def visit_lth(self, exp, env):
+        return exp.left.accept(self, env) | exp.right.accept(self, env)
+
+    def visit_neg(self, exp, env):
+        return exp.exp.accept(self, env)
+
+    def visit_not(self, exp, env):
+        return exp.exp.accept(self, env)
+
+    def visit_let(self, exp, env):
+        undefVars_e0 = exp.exp_def.accept(self, env)
+        body_env = set(env) | {exp.identifier}
+        undefVars_e1 = exp.exp_body.accept(self, body_env)
+        return undefVars_e0 | undefVars_e1
+
 
 def safe_eval(exp):
     """
@@ -184,5 +226,17 @@ def safe_eval(exp):
     >>> safe_eval(e1)
     Error: expression contains undefined variables.
     """
-    # TODO: Implement this method!
-    raise NotImplementedError
+    useDefVisitor = UseDefVisitor()
+    undefVars = exp.accept(useDefVisitor, set())
+    if len(undefVars) > 0:
+        print(f"Error: expression contains undefined variables.")
+    else:
+        evalVisitor = EvalVisitor()
+        print(f"Value is {exp.accept(evalVisitor, {})}")
+
+
+if __name__ == "__main__":
+    e0 = Add(Let('y', Num(3), Var('y')), Var('x'))
+    v = UseDefVisitor()
+    x = e0.accept(v, {})
+    print(x)
