@@ -331,18 +331,5 @@ class Parser:
             token = self.current_token
             if token.kind != TokenType.END:
                 raise ValueError("Bloco let sem end")
+            self.consumeToken(TokenType.END)
             return Let(name, e0, e1)
-
-
-if __name__ == "__main__":
-    tk0 = Token('let', TokenType.LET)
-    tk1 = Token('v', TokenType.VAR)
-    tk2 = Token('<-', TokenType.ASN)
-    tk3 = Token('21', TokenType.NUM)
-    tk4 = Token('in', TokenType.INX)
-    tk5 = Token('v', TokenType.VAR)
-    tk6 = Token('+', TokenType.ADD)
-    tk7 = Token('v', TokenType.VAR)
-    tk8 = Token('end', TokenType.END)
-    parser = Parser([tk0, tk1, tk2, tk3, tk4, tk5, tk6, tk7, tk8])
-    exp = parser.parse()

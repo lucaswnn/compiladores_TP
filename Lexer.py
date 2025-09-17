@@ -750,6 +750,7 @@ class Lexer:
 
     def state_variable(self):
         if self.cur_pos + 1 >= self.length:
+            self.buffer += self.source[self.cur_pos]
             return "state_variable", "else", None
 
         cur_char = self.source[self.cur_pos]
