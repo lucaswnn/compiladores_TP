@@ -174,8 +174,10 @@ class CtrGenVisitor(Visitor):
             >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
             ["(<class 'bool'>, 'TV_1')", "(<class 'int'>, 'TV_2')"]
         """
-        # TODO: Implement this method!
-        raise NotImplementedError
+        fresh_type_var = self.fresh_type_var()
+        crts_left = exp.left.accept(self, fresh_type_var)
+        crts_right = exp.right.accept(self, fresh_type_var)
+        return crts_left | crts_right | {(type(True), type_var)}
 
     def visit_and(self, exp, type_var):
         """
@@ -191,8 +193,9 @@ class CtrGenVisitor(Visitor):
         remove them from the set of constraints later on, when we try to
         solve them.
         """
-        # TODO: Implement this method!
-        raise NotImplementedError
+        crts_left = exp.left.accept(self, type(True))
+        crts_right = exp.right.accept(self, type(True))
+        return crts_left | crts_right | {(type(True), type_var)}
 
     def visit_or(self, exp, type_var):
         """
@@ -202,8 +205,9 @@ class CtrGenVisitor(Visitor):
             >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
             ["(<class 'bool'>, 'TV_1')", "(<class 'bool'>, <class 'bool'>)"]
         """
-        # TODO: Implement this method!
-        raise NotImplementedError
+        crts_left = exp.left.accept(self, type(True))
+        crts_right = exp.right.accept(self, type(True))
+        return crts_left | crts_right | {(type(True), type_var)}
 
     def visit_add(self, exp, type_var):
         """
@@ -213,8 +217,9 @@ class CtrGenVisitor(Visitor):
             >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
             ["(<class 'int'>, 'TV_1')", "(<class 'int'>, <class 'int'>)"]
         """
-        # TODO: Implement this method!
-        raise NotImplementedError
+        crts_left = exp.left.accept(self, type(1))
+        crts_right = exp.right.accept(self, type(1))
+        return crts_left | crts_right | {(type(1), type_var)}
 
     def visit_sub(self, exp, type_var):
         """
@@ -224,8 +229,9 @@ class CtrGenVisitor(Visitor):
             >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
             ["(<class 'int'>, 'TV_1')", "(<class 'int'>, <class 'int'>)"]
         """
-        # TODO: Implement this method!
-        raise NotImplementedError
+        crts_left = exp.left.accept(self, type(1))
+        crts_right = exp.right.accept(self, type(1))
+        return crts_left | crts_right | {(type(1), type_var)}
 
     def visit_mul(self, exp, type_var):
         """
@@ -235,8 +241,9 @@ class CtrGenVisitor(Visitor):
             >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
             ["(<class 'int'>, 'TV_1')", "(<class 'int'>, <class 'int'>)"]
         """
-        # TODO: Implement this method!
-        raise NotImplementedError
+        crts_left = exp.left.accept(self, type(1))
+        crts_right = exp.right.accept(self, type(1))
+        return crts_left | crts_right | {(type(1), type_var)}
 
     def visit_div(self, exp, type_var):
         """
@@ -246,8 +253,9 @@ class CtrGenVisitor(Visitor):
             >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
             ["(<class 'int'>, 'TV_1')", "(<class 'int'>, <class 'int'>)"]
         """
-        # TODO: Implement this method!
-        raise NotImplementedError
+        crts_left = exp.left.accept(self, type(1))
+        crts_right = exp.right.accept(self, type(1))
+        return crts_left | crts_right | {(type(1), type_var)}
 
     def visit_leq(self, exp, type_var):
         """
@@ -257,8 +265,9 @@ class CtrGenVisitor(Visitor):
             >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
             ["(<class 'bool'>, 'TV_1')", "(<class 'int'>, <class 'int'>)"]
         """
-        # TODO: Implement this method!
-        raise NotImplementedError
+        crts_left = exp.left.accept(self, type(1))
+        crts_right = exp.right.accept(self, type(1))
+        return crts_left | crts_right | {(type(True), type_var)}
 
     def visit_lth(self, exp, type_var):
         """
@@ -268,8 +277,9 @@ class CtrGenVisitor(Visitor):
             >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
             ["(<class 'bool'>, 'TV_1')", "(<class 'int'>, <class 'int'>)"]
         """
-        # TODO: Implement this method!
-        raise NotImplementedError
+        crts_left = exp.left.accept(self, type(1))
+        crts_right = exp.right.accept(self, type(1))
+        return crts_left | crts_right | {(type(True), type_var)}
 
     def visit_neg(self, exp, type_var):
         """
@@ -279,8 +289,8 @@ class CtrGenVisitor(Visitor):
             >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
             ["(<class 'int'>, 'TV_1')", "(<class 'int'>, <class 'int'>)"]
         """
-        # TODO: Implement this method!
-        raise NotImplementedError
+        crts = exp.exp.accept(self, type(1))
+        return crts | {(type(1), type_var)}
 
     def visit_not(self, exp, type_var):
         """
@@ -290,8 +300,8 @@ class CtrGenVisitor(Visitor):
             >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
             ["(<class 'bool'>, 'TV_1')", "(<class 'bool'>, <class 'bool'>)"]
         """
-        # TODO: Implement this method!
-        raise NotImplementedError
+        crts = exp.exp.accept(self, type(True))
+        return crts | {(type(True), type_var)}
 
     def visit_let(self, exp, type_var):
         """
@@ -301,8 +311,10 @@ class CtrGenVisitor(Visitor):
             >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
             ["('TV_1', 'TV_2')", "('v', 'TV_2')", "(<class 'int'>, 'v')"]
         """
-        # TODO: Implement this method!
-        raise NotImplementedError
+        fresh_type_var = self.fresh_type_var()
+        crts_def = exp.exp_def.accept(self, exp.identifier)
+        crts_body = exp.exp_body.accept(self, fresh_type_var)
+        return crts_def | crts_body | {(type_var, fresh_type_var)}
 
     def visit_ifThenElse(self, exp, type_var):
         """
@@ -312,5 +324,8 @@ class CtrGenVisitor(Visitor):
             >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
             ["('TV_1', 'TV_2')", "(<class 'bool'>, <class 'bool'>)", "(<class 'int'>, 'TV_2')"]
         """
-        # TODO: Implement this method!
-        raise NotImplementedError
+        fresh_type_var = self.fresh_type_var()
+        crts_cond = exp.cond.accept(self, type(True))
+        crts_e0 = exp.e0.accept(self, fresh_type_var)
+        crts_e1 = exp.e1.accept(self, fresh_type_var)
+        return crts_cond | crts_e0 | crts_e1 | {(type_var, fresh_type_var)}
