@@ -135,6 +135,60 @@ class Add(BinaryExpression):
         return visitor.visit_add(self, arg)
 
 
+class And(BinaryExpression):
+    """
+    This class represents the logical disjunction of two boolean expressions.
+    The evaluation of an expression of this kind is the logical AND of the two
+    subexpression's values.
+    """
+
+    def accept(self, visitor, arg):
+        """
+        Example:
+        >>> b1 = Bln(True)
+        >>> b2 = Bln(False)
+        >>> e = And(b1, b2)
+        >>> ev = EvalVisitor()
+        >>> e.accept(ev, None)
+        False
+
+        >>> b1 = Bln(True)
+        >>> b2 = Bln(True)
+        >>> e = And(b1, b2)
+        >>> ev = EvalVisitor()
+        >>> e.accept(ev, None)
+        True
+        """
+        return visitor.visit_and(self, arg)
+
+
+class Or(BinaryExpression):
+    """
+    This class represents the logical conjunction of two boolean expressions.
+    The evaluation of an expression of this kind is the logical OR of the two
+    subexpression's values.
+    """
+
+    def accept(self, visitor, arg):
+        """
+        Example:
+        >>> b1 = Bln(True)
+        >>> b2 = Bln(False)
+        >>> e = Or(b1, b2)
+        >>> ev = EvalVisitor()
+        >>> e.accept(ev, None)
+        True
+
+        >>> b1 = Bln(False)
+        >>> b2 = Bln(False)
+        >>> e = Or(b1, b2)
+        >>> ev = EvalVisitor()
+        >>> e.accept(ev, None)
+        False
+        """
+        return visitor.visit_or(self, arg)
+
+
 class Sub(BinaryExpression):
     """
     This class represents subtraction of two expressions. The acceptuation of such
@@ -357,3 +411,35 @@ class Let(Expression):
         1764
         """
         return visitor.visit_let(self, arg)
+
+
+class IfThenElse(Expression):
+    """
+    This class represents a conditional expression. The semantics an expression
+    such as 'if B then E0 else E1' is as follows:
+    1. Evaluate B. Call the result ValueB.
+    2. If ValueB is True, then evalute E0 and return the result.
+    3. If ValueB is False, then evaluate E1 and return the result.
+    Notice that we only evaluate one of the two sub-expressions, not both. Thus,
+    "if True then 0 else 1 div 0" will return 0 indeed.
+    """
+
+    def __init__(self, cond, e0, e1):
+        self.cond = cond
+        self.e0 = e0
+        self.e1 = e1
+
+    def accept(self, visitor, arg):
+        """
+        Example:
+        >>> e = IfThenElse(Bln(True), Num(42), Num(30))
+        >>> ev = EvalVisitor()
+        >>> e.accept(ev, {})
+        42
+
+        >>> e = IfThenElse(Bln(False), Num(42), Num(30))
+        >>> ev = EvalVisitor()
+        >>> e.accept(ev, {})
+        30
+        """
+        return visitor.visit_ifThenElse(self, arg)

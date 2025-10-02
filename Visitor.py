@@ -29,6 +29,14 @@ class Visitor(ABC):
         pass
 
     @abstractmethod
+    def visit_and(self, exp, arg):
+        pass
+
+    @abstractmethod
+    def visit_or(self, exp, arg):
+        pass
+
+    @abstractmethod
     def visit_add(self, exp, arg):
         pass
 
@@ -64,6 +72,10 @@ class Visitor(ABC):
     def visit_let(self, exp, arg):
         pass
 
+    @abstractmethod
+    def visit_ifThenElse(self, exp, arg):
+        pass
+
 
 class EvalVisitor(Visitor):
     """
@@ -90,7 +102,7 @@ class EvalVisitor(Visitor):
         if exp.identifier in env:
             return env[exp.identifier]
 
-        sys.exit(f"Variavel inexistente {exp.identifier}.")
+        sys.exit(f"Def error")
 
     def visit_bln(self, exp, env):
         return exp.bln
@@ -99,31 +111,92 @@ class EvalVisitor(Visitor):
         return exp.num
 
     def visit_eql(self, exp, env):
-        return exp.left.accept(self, env) == exp.right.accept(self, env)
+        val_left = exp.left.accept(self, env)
+        val_right = exp.right.accept(self, env)
+        type_val_left = type(val_left)
+        type_val_right = type(val_right)
+        if (
+            (type_val_left == type(1) or type_val_left == type(True))
+            and type_val_left == type_val_right
+        ):
+            return val_left == val_right
+        sys.exit("Type error")
+
+    def visit_and(self, exp, env):
+        val_left = exp.left.accept(self, env)
+        if type(val_left) != type(True):
+            sys.exit("Type error")
+        if not val_left:
+            return False
+        val_right = exp.right.accept(self, env)
+        if type(val_right) != type(True):
+            sys.exit("Type error")
+        return val_right
+
+    def visit_or(self, exp, env):
+        val_left = exp.left.accept(self, env)
+        if type(val_left) != type(True):
+            sys.exit("Type error")
+        if val_left:
+            return True
+        val_right = exp.right.accept(self, env)
+        if type(val_right) != type(True):
+            sys.exit("Type error")
+        return val_right
 
     def visit_add(self, exp, env):
-        return exp.left.accept(self, env) + exp.right.accept(self, env)
+        val_left = exp.left.accept(self, env)
+        val_right = exp.right.accept(self, env)
+        if type(val_left) == type(1) and type(val_right) == type(1):
+            return val_left + val_right
+        sys.exit("Type error")
 
     def visit_sub(self, exp, env):
-        return exp.left.accept(self, env) - exp.right.accept(self, env)
+        val_left = exp.left.accept(self, env)
+        val_right = exp.right.accept(self, env)
+        if type(val_left) == type(1) and type(val_right) == type(1):
+            return val_left - val_right
+        sys.exit("Type error")
 
     def visit_mul(self, exp, env):
-        return exp.left.accept(self, env) * exp.right.accept(self, env)
+        val_left = exp.left.accept(self, env)
+        val_right = exp.right.accept(self, env)
+        if type(val_left) == type(1) and type(val_right) == type(1):
+            return val_left * val_right
+        sys.exit("Type error")
 
     def visit_div(self, exp, env):
-        return exp.left.accept(self, env) // exp.right.accept(self, env)
+        val_left = exp.left.accept(self, env)
+        val_right = exp.right.accept(self, env)
+        if type(val_left) == type(1) and type(val_right) == type(1):
+            return val_left // val_right
+        sys.exit("Type error")
 
     def visit_leq(self, exp, env):
-        return exp.left.accept(self, env) <= exp.right.accept(self, env)
+        val_left = exp.left.accept(self, env)
+        val_right = exp.right.accept(self, env)
+        if type(val_left) == type(1) and type(val_right) == type(1):
+            return val_left <= val_right
+        sys.exit("Type error")
 
     def visit_lth(self, exp, env):
-        return exp.left.accept(self, env) < exp.right.accept(self, env)
+        val_left = exp.left.accept(self, env)
+        val_right = exp.right.accept(self, env)
+        if type(val_left) == type(1) and type(val_right) == type(1):
+            return val_left < val_right
+        sys.exit("Type error")
 
     def visit_neg(self, exp, env):
-        return -exp.exp.accept(self, env)
+        val = exp.exp.accept(self, env)
+        if type(val) == type(1):
+            return -val
+        sys.exit("Type error")
 
     def visit_not(self, exp, env):
-        return not exp.exp.accept(self, env)
+        val = exp.exp.accept(self, env)
+        if type(val) == type(True):
+            return not val
+        sys.exit("Type error")
 
     def visit_let(self, exp, env):
         e0_val = exp.exp_def.accept(self, env)
@@ -131,105 +204,11 @@ class EvalVisitor(Visitor):
         new_env[exp.identifier] = e0_val
         return exp.exp_body.accept(self, new_env)
 
-
-class UseDefVisitor(Visitor):
-    """
-    The UseDefVisitor class reports the use of undefined variables. It takes
-    as input an environment of defined variables, and produces, as output,
-    the set of all the variables that are used without being defined.
-
-    Examples:
-    >>> e0 = Let('v', Add(Num(40), Num(2)), Mul(Var('v'), Var('v')))
-    >>> e1 = Not(Eql(e0, Num(1764)))
-    >>> ev = UseDefVisitor()
-    >>> len(e1.accept(ev, set()))
-    0
-
-    >>> e0 = Let('v', Add(Num(40), Num(2)), Sub(Var('v'), Num(2)))
-    >>> e1 = Lth(e0, Var('x'))
-    >>> ev = UseDefVisitor()
-    >>> len(e1.accept(ev, set()))
-    1
-
-    >>> e = Let('v', Add(Num(40), Var('v')), Sub(Var('v'), Num(2)))
-    >>> ev = UseDefVisitor()
-    >>> len(e.accept(ev, set()))
-    1
-
-    >>> e1 = Let('v', Add(Num(40), Var('v')), Sub(Var('v'), Num(2)))
-    >>> e0 = Let('v', Num(3), e1)
-    >>> ev = UseDefVisitor()
-    >>> len(e0.accept(ev, set()))
-    0
-    """
-
-    def visit_var(self, exp, env):
-        if exp.identifier in env:
-            return set()
-
-        return set({exp.identifier})
-
-    def visit_bln(self, exp, env):
-        return set()
-
-    def visit_num(self, exp, env):
-        return set()
-
-    def visit_eql(self, exp, env):
-        return exp.left.accept(self, env) | exp.right.accept(self, env)
-
-    def visit_add(self, exp, env):
-        return exp.left.accept(self, env) | exp.right.accept(self, env)
-
-    def visit_sub(self, exp, env):
-        return exp.left.accept(self, env) | exp.right.accept(self, env)
-
-    def visit_mul(self, exp, env):
-        return exp.left.accept(self, env) | exp.right.accept(self, env)
-
-    def visit_div(self, exp, env):
-        return exp.left.accept(self, env) | exp.right.accept(self, env)
-
-    def visit_leq(self, exp, env):
-        return exp.left.accept(self, env) | exp.right.accept(self, env)
-
-    def visit_lth(self, exp, env):
-        return exp.left.accept(self, env) | exp.right.accept(self, env)
-
-    def visit_neg(self, exp, env):
-        return exp.exp.accept(self, env)
-
-    def visit_not(self, exp, env):
-        return exp.exp.accept(self, env)
-
-    def visit_let(self, exp, env):
-        undefVars_e0 = exp.exp_def.accept(self, env)
-        body_env = set(env) | {exp.identifier}
-        undefVars_e1 = exp.exp_body.accept(self, body_env)
-        return undefVars_e0 | undefVars_e1
-
-
-def safe_eval(exp):
-    """
-    This method applies one simple semantic analysis onto an expression, before
-    evaluating it: it checks if the expression contains free variables, there
-    is, variables used without being defined.
-
-    Example:
-    >>> e0 = Let('v', Add(Num(40), Num(2)), Mul(Var('v'), Var('v')))
-    >>> e1 = Not(Eql(e0, Num(1764)))
-    >>> safe_eval(e1)
-    Value is False
-
-    >>> e0 = Let('v', Add(Num(40), Num(2)), Sub(Var('v'), Num(2)))
-    >>> e1 = Lth(e0, Var('x'))
-    >>> safe_eval(e1)
-    Error: expression contains undefined variables.
-    """
-    useDefVisitor = UseDefVisitor()
-    undefVars = exp.accept(useDefVisitor, set())
-    if len(undefVars) > 0:
-        print(f"Error: expression contains undefined variables.")
-    else:
-        evalVisitor = EvalVisitor()
-        print(f"Value is {exp.accept(evalVisitor, {})}")
+    def visit_ifThenElse(self, exp, env):
+        cond_val = exp.cond.accept(self, env)
+        if type(cond_val) != type(True):
+            sys.exit("Type error")
+        if cond_val:
+            return exp.e0.accept(self, env)
+        else:
+            return exp.e1.accept(self, env)

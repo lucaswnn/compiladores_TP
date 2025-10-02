@@ -6,6 +6,19 @@ from Lexer import Token, TokenType
 """
 This file implements the parser of arithmetic expressions.
 
+Precedence table:
+    1: not ~ ()
+    2: *   /
+    3: +   -
+    4: <   <=   >=   >
+    5: =
+    6: and
+    7: or
+    8: if-then-else
+
+Notice that not 2 < 3 must be a type error, as we are trying to apply a boolean
+operation (not) onto a number.
+
 References:
     see https://www.engr.mun.ca/~theo/Misc/exp_parsing.htm
 """
@@ -43,24 +56,28 @@ class Parser:
         Examples:
         >>> parser = Parser([Token('123', TokenType.NUM)])
         >>> exp = parser.parse()
-        >>> exp.eval(None)
+        >>> ev = EvalVisitor()
+        >>> exp.accept(ev, None)
         123
 
         >>> parser = Parser([Token('True', TokenType.TRU)])
         >>> exp = parser.parse()
-        >>> exp.eval(None)
+        >>> ev = EvalVisitor()
+        >>> exp.accept(ev, None)
         True
 
         >>> parser = Parser([Token('False', TokenType.FLS)])
         >>> exp = parser.parse()
-        >>> exp.eval(None)
+        >>> ev = EvalVisitor()
+        >>> exp.accept(ev, None)
         False
 
         >>> tk0 = Token('~', TokenType.NEG)
         >>> tk1 = Token('123', TokenType.NUM)
         >>> parser = Parser([tk0, tk1])
         >>> exp = parser.parse()
-        >>> exp.eval(None)
+        >>> ev = EvalVisitor()
+        >>> exp.accept(ev, None)
         -123
 
         >>> tk0 = Token('3', TokenType.NUM)
@@ -68,7 +85,8 @@ class Parser:
         >>> tk2 = Token('4', TokenType.NUM)
         >>> parser = Parser([tk0, tk1, tk2])
         >>> exp = parser.parse()
-        >>> exp.eval(None)
+        >>> ev = EvalVisitor()
+        >>> exp.accept(ev, None)
         12
 
         >>> tk0 = Token('3', TokenType.NUM)
@@ -77,7 +95,8 @@ class Parser:
         >>> tk3 = Token('4', TokenType.NUM)
         >>> parser = Parser([tk0, tk1, tk2, tk3])
         >>> exp = parser.parse()
-        >>> exp.eval(None)
+        >>> ev = EvalVisitor()
+        >>> exp.accept(ev, None)
         -12
 
         >>> tk0 = Token('30', TokenType.NUM)
@@ -85,7 +104,8 @@ class Parser:
         >>> tk2 = Token('4', TokenType.NUM)
         >>> parser = Parser([tk0, tk1, tk2])
         >>> exp = parser.parse()
-        >>> exp.eval(None)
+        >>> ev = EvalVisitor()
+        >>> exp.accept(ev, None)
         7
 
         >>> tk0 = Token('3', TokenType.NUM)
@@ -93,7 +113,8 @@ class Parser:
         >>> tk2 = Token('4', TokenType.NUM)
         >>> parser = Parser([tk0, tk1, tk2])
         >>> exp = parser.parse()
-        >>> exp.eval(None)
+        >>> ev = EvalVisitor()
+        >>> exp.accept(ev, None)
         7
 
         >>> tk0 = Token('30', TokenType.NUM)
@@ -101,7 +122,8 @@ class Parser:
         >>> tk2 = Token('4', TokenType.NUM)
         >>> parser = Parser([tk0, tk1, tk2])
         >>> exp = parser.parse()
-        >>> exp.eval(None)
+        >>> ev = EvalVisitor()
+        >>> exp.accept(ev, None)
         26
 
         >>> tk0 = Token('2', TokenType.NUM)
@@ -113,7 +135,8 @@ class Parser:
         >>> tk6 = Token(')', TokenType.RPR)
         >>> parser = Parser([tk0, tk1, tk2, tk3, tk4, tk5, tk6])
         >>> exp = parser.parse()
-        >>> exp.eval(None)
+        >>> ev = EvalVisitor()
+        >>> exp.accept(ev, None)
         14
 
         >>> tk0 = Token('4', TokenType.NUM)
@@ -121,7 +144,8 @@ class Parser:
         >>> tk2 = Token('4', TokenType.NUM)
         >>> parser = Parser([tk0, tk1, tk2])
         >>> exp = parser.parse()
-        >>> exp.eval(None)
+        >>> ev = EvalVisitor()
+        >>> exp.accept(ev, None)
         True
 
         >>> tk0 = Token('4', TokenType.NUM)
@@ -129,7 +153,8 @@ class Parser:
         >>> tk2 = Token('4', TokenType.NUM)
         >>> parser = Parser([tk0, tk1, tk2])
         >>> exp = parser.parse()
-        >>> exp.eval(None)
+        >>> ev = EvalVisitor()
+        >>> exp.accept(ev, None)
         True
 
         >>> tk0 = Token('4', TokenType.NUM)
@@ -137,17 +162,39 @@ class Parser:
         >>> tk2 = Token('4', TokenType.NUM)
         >>> parser = Parser([tk0, tk1, tk2])
         >>> exp = parser.parse()
-        >>> exp.eval(None)
+        >>> ev = EvalVisitor()
+        >>> exp.accept(ev, None)
         False
 
         >>> tk0 = Token('not', TokenType.NOT)
-        >>> tk1 = Token('4', TokenType.NUM)
-        >>> tk2 = Token('<', TokenType.LTH)
-        >>> tk3 = Token('4', TokenType.NUM)
-        >>> parser = Parser([tk0, tk1, tk2, tk3])
+        >>> tk1 = Token('(', TokenType.LPR)
+        >>> tk2 = Token('4', TokenType.NUM)
+        >>> tk3 = Token('<', TokenType.LTH)
+        >>> tk4 = Token('4', TokenType.NUM)
+        >>> tk5 = Token(')', TokenType.RPR)
+        >>> parser = Parser([tk0, tk1, tk2, tk3, tk4, tk5])
         >>> exp = parser.parse()
-        >>> exp.eval(None)
+        >>> ev = EvalVisitor()
+        >>> exp.accept(ev, None)
         True
+
+        >>> tk0 = Token('true', TokenType.TRU)
+        >>> tk1 = Token('or', TokenType.ORX)
+        >>> tk2 = Token('false', TokenType.FLS)
+        >>> parser = Parser([tk0, tk1, tk2])
+        >>> exp = parser.parse()
+        >>> ev = EvalVisitor()
+        >>> exp.accept(ev, None)
+        True
+
+        >>> tk0 = Token('true', TokenType.TRU)
+        >>> tk1 = Token('and', TokenType.AND)
+        >>> tk2 = Token('false', TokenType.FLS)
+        >>> parser = Parser([tk0, tk1, tk2])
+        >>> exp = parser.parse()
+        >>> ev = EvalVisitor()
+        >>> exp.accept(ev, None)
+        False
 
         >>> tk0 = Token('let', TokenType.LET)
         >>> tk1 = Token('v', TokenType.VAR)
@@ -158,7 +205,8 @@ class Parser:
         >>> tk6 = Token('end', TokenType.END)
         >>> parser = Parser([tk0, tk1, tk2, tk3, tk4, tk5, tk6])
         >>> exp = parser.parse()
-        >>> exp.eval({})
+        >>> ev = EvalVisitor()
+        >>> exp.accept(ev, {})
         42
 
         >>> tk0 = Token('let', TokenType.LET)
@@ -172,60 +220,84 @@ class Parser:
         >>> tk8 = Token('end', TokenType.END)
         >>> parser = Parser([tk0, tk1, tk2, tk3, tk4, tk5, tk6, tk7, tk8])
         >>> exp = parser.parse()
-        >>> exp.eval({})
+        >>> ev = EvalVisitor()
+        >>> exp.accept(ev, {})
         42
 
-        >>> tk0 = Token('not', TokenType.NOT)
-        >>> tk1 = Token('(', TokenType.LPR)
-        >>> tk2 = Token('(', TokenType.LPR)
-        >>> tk3 = Token('2', TokenType.NUM)
-        >>> tk4 = Token('+', TokenType.ADD)
-        >>> tk5 = Token('5', TokenType.NUM)
-        >>> tk6 = Token(')', TokenType.RPR)
-        >>> tk7 = Token('*', TokenType.MUL)
-        >>> tk8 = Token('2', TokenType.NUM)
-        >>> tk9 = Token('<', TokenType.LTH)
-        >>> tk10 = Token('13', TokenType.NUM)
-        >>> tk11 = Token('=', TokenType.EQL)
-        >>> tk12 = Token('true', TokenType.TRU)
-        >>> tk13 = Token(')', TokenType.RPR)
-        >>> parser = Parser([tk0, tk1, tk2, tk3, tk4, tk5, tk6, tk7, tk8, tk9, tk10, tk11, tk12, tk13])
-        >>> exp = parser.parse()
-        >>> exp.eval({})
-        True
-
-        >>> tk0 = Token('let', TokenType.LET)
-        >>> tk1 = Token('x', TokenType.VAR)
-        >>> tk2 = Token('<-', TokenType.ASN)
+        >>> tk0 = Token('if', TokenType.IFX)
+        >>> tk1 = Token('2', TokenType.NUM)
+        >>> tk2 = Token('<', TokenType.LTH)
         >>> tk3 = Token('3', TokenType.NUM)
-        >>> tk4 = Token('in', TokenType.INX)
-        >>> tk5 = Token('let', TokenType.LET)
-        >>> tk6 = Token('y', TokenType.VAR)
-        >>> tk7 = Token('<-', TokenType.ASN)
-        >>> tk8 = Token('4', TokenType.NUM)
-        >>> tk9 = Token('in', TokenType.INX)
-        >>> tk10 = Token('x', TokenType.VAR)
-        >>> tk11 = Token('end', TokenType.END)
-        >>> tk12 = Token('end', TokenType.END)
-        >>> parser = Parser([tk0, tk1, tk2, tk3, tk4, tk5, tk6, tk7, tk8, tk9, tk10, tk11, tk12])
+        >>> tk4 = Token('then', TokenType.THN)
+        >>> tk5 = Token('1', TokenType.NUM)
+        >>> tk6 = Token('else', TokenType.ELS)
+        >>> tk7 = Token('2', TokenType.NUM)
+        >>> parser = Parser([tk0, tk1, tk2, tk3, tk4, tk5, tk6, tk7])
         >>> exp = parser.parse()
-        >>> exp.eval({})
-        3
+        >>> ev = EvalVisitor()
+        >>> exp.accept(ev, None)
+        1
+
+        >>> tk0 = Token('if', TokenType.IFX)
+        >>> tk1 = Token('false', TokenType.FLS)
+        >>> tk2 = Token('then', TokenType.THN)
+        >>> tk3 = Token('1', TokenType.NUM)
+        >>> tk4 = Token('else', TokenType.ELS)
+        >>> tk5 = Token('2', TokenType.NUM)
+        >>> parser = Parser([tk0, tk1, tk2, tk3, tk4, tk5])
+        >>> exp = parser.parse()
+        >>> ev = EvalVisitor()
+        >>> exp.accept(ev, None)
+        2
         """
 
         return self.Exp()
 
     def Exp(self):
-        return self.Not()
+        return self.ITE()
 
-    def Not(self):
+    def ITE(self):
         token = self.current_token
-        if token.kind == TokenType.NOT:
-            self.consumeToken(TokenType.NOT)
-            exp = self.B()
-            return Not(exp)
+        if token.kind == TokenType.IFX:
+            self.consumeToken(TokenType.IFX)
+            if_exp = self.ITE()
+            token = self.current_token
+            if token.kind != TokenType.THN:
+                sys.exit("Parse error")
+            self.consumeToken(TokenType.THN)
+            then_exp = self.DIS()
+            token = self.current_token
+            if token.kind != TokenType.ELS:
+                sys.exit("Parse error")
+            self.consumeToken(TokenType.ELS)
+            else_exp = self.DIS()
+            return IfThenElse(if_exp, then_exp, else_exp)
 
-        return self.B()
+        return self.DIS()
+
+    def DIS(self):
+        exp = self.CON()
+        return self.Disjunction(exp)
+
+    def Disjunction(self, left):
+        token = self.current_token
+        if token.kind == TokenType.ORX:
+            self.consumeToken(TokenType.ORX)
+            right = self.CON()
+            return self.Disjunction(Or(left, right))
+        return left
+
+    def CON(self):
+        exp = self.B()
+        return self.Conjunction(exp)
+
+    def Conjunction(self, left):
+        token = self.current_token
+        if token.kind == TokenType.AND:
+            self.consumeToken(TokenType.AND)
+            right = self.B()
+            return self.Conjunction(And(left, right))
+        return left
 
     def B(self):
         exp = self.P()
@@ -302,6 +374,14 @@ class Parser:
 
         elif token.kind == TokenType.NEG:
             self.consumeToken(TokenType.NEG)
+            token = self.current_token
+            if (not
+                (token.kind == TokenType.LPR or
+                         token.kind == TokenType.VAR or
+                         token.kind == TokenType.NUM or
+                         token.kind == TokenType.LET)
+                ):
+                sys.exit("Parse error")
             node = self.F()
             return Neg(node)
 
@@ -311,25 +391,40 @@ class Parser:
             self.consumeToken(TokenType.RPR)  # ')'
             return node
 
+        elif token.kind == TokenType.NOT:
+            self.consumeToken(TokenType.NOT)
+            token = self.current_token
+            if (not
+                    (token.kind == TokenType.LPR
+                     or token.kind == TokenType.VAR
+                     or token.kind == TokenType.TRU
+                     or token.kind == TokenType.FLS
+                     or token.kind == TokenType.NUM
+                     or token.kind == TokenType.LET)
+                    ):
+                sys.exit("Parse error")
+            node = self.F()
+            return Not(node)
+
         elif token.kind == TokenType.LET:
             self.consumeToken(TokenType.LET)
             token = self.current_token
             if token.kind != TokenType.VAR:
-                raise ValueError("Bloco let não começa com variável")
+                sys.exit("Parse error")
             self.consumeToken(TokenType.VAR)
             name = token.text
             token = self.current_token
             if token.kind != TokenType.ASN:
-                raise ValueError("Variável sem símbolo de assign")
+                sys.exit("Parse error")
             self.consumeToken(TokenType.ASN)
             e0 = self.Exp()
             token = self.current_token
             if token.kind != TokenType.INX:
-                raise ValueError("Bloco let sem in")
+                sys.exit("Parse error")
             self.consumeToken(TokenType.INX)
             e1 = self.Exp()
             token = self.current_token
             if token.kind != TokenType.END:
-                raise ValueError("Bloco let sem end")
+                sys.exit("Parse error")
             self.consumeToken(TokenType.END)
             return Let(name, e0, e1)
