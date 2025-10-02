@@ -1,7 +1,17 @@
-Exp ::= Not
+Exp ::= ITE
 
-Not ::= not B
-| B
+ITE ::= if ITE then DIS else DIS
+| DIS
+
+DIS ::= CON Disjunction
+
+Disjunction ::= 'or' CON Disjunction
+| empty
+
+CON ::= B Conjunction
+
+Conjunction ::= 'and' B Conjunction
+| empty
 
 B ::= P Bool
 
@@ -25,4 +35,5 @@ Mul ::= '*' F Mul
 F ::= num | True | False | var
 | '~' F
 | '(' Exp ')'
-| let name <- Exp in Exp end
+| 'let' name '<-' Exp 'in' Exp 'end'
+| 'not' F

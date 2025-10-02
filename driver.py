@@ -9,19 +9,11 @@ if __name__ == "__main__":
     Este arquivo nao deve ser alterado, mas deve ser enviado para resolver o
     VPL. O arquivo contem o codigo que testa a implementacao do parser.
     """
-    text = sys.stdin.read()
-    (option, rest) = text.split(maxsplit=1)
-    lexer = Lexer(rest)
-    tokens = [token for token in lexer.tokens()]
-    parser = Parser(tokens)
+    #text = sys.stdin.read()
+    text = "~ if 2 < 3 then 1 else 0"
+    lexer = Lexer(text)
+    tks = [x for x in lexer.tokens()]
+    parser = Parser(tks)
     exp = parser.parse()
-    if option == 'eval':
-        visitor = EvalVisitor()
-        print(f"Value is {exp.accept(visitor, {})}")
-    elif option == 'usedef':
-        visitor = UseDefVisitor()
-        print(f"Are there undefs? {len(exp.accept(visitor, set())) > 0}")
-    elif option == 'safe_eval':
-        safe_eval(exp)
-    else:
-        sys.exit(f"Invalid option = {option}")
+    visitor = EvalVisitor()
+    print(f"{exp.accept(visitor, {})}")

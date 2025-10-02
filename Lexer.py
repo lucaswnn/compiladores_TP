@@ -36,18 +36,23 @@ class TokenType(enum.Enum):
     LET = 8   # The 'let' of the let expression
     INX = 9   # The 'in' of the let expression
     END = 10  # The 'end' of the let expression
-    EQL = 201
-    ADD = 202
-    SUB = 203
-    MUL = 204
-    DIV = 205
-    LEQ = 206
-    LTH = 207
-    NEG = 208
-    NOT = 209
-    LPR = 210
-    RPR = 211
+    EQL = 201  # x = y
+    ADD = 202  # x + y
+    SUB = 203  # x - y
+    MUL = 204  # x * y
+    DIV = 205  # x / y
+    LEQ = 206  # x <= y
+    LTH = 207  # x < y
+    NEG = 208  # ~x
+    NOT = 209  # not x
+    LPR = 210  # (
+    RPR = 211  # )
     ASN = 212  # The assignment '<-' operator
+    ORX = 213  # x or y
+    AND = 214  # x and y
+    IFX = 215  # The 'if' of a conditional expression
+    THN = 216  # The 'then' of a conditional expression
+    ELS = 217  # The 'else' of a conditional expression
 
 
 class Lexer:
@@ -83,6 +88,8 @@ class Lexer:
                 "f": self.state_false0,
                 "l": self.state_let0,
                 "e": self.state_end0,
+                "o": self.state_or0,
+                "a": self.state_and0,
                 "i": self.state_in0,
                 "0": self.state_zero,
                 "digit_not_zero": self.state_integer,
@@ -101,8 +108,29 @@ class Lexer:
                 "var": self.state_variable,
                 "else": self.state_LET,
             },
+            "state_and0": {
+                "n": self.state_and1,
+                "var": self.state_variable,
+            },
+            "state_and1": {
+                "d": self.state_and2,
+                "var": self.state_variable,
+            },
+            "state_and2": {
+                "var": self.state_variable,
+                "else": self.state_AND,
+            },
+            "state_or0": {
+                "r": self.state_or1,
+                "var": self.state_variable,
+            },
+            "state_or1": {
+                "var": self.state_variable,
+                "else": self.state_ORX,
+            },
             "state_end0": {
                 "n": self.state_end1,
+                "l": self.state_else0,
                 "var": self.state_variable,
             },
             "state_end1": {
@@ -113,13 +141,30 @@ class Lexer:
                 "var": self.state_variable,
                 "else": self.state_END,
             },
+            "state_else0": {
+                "s": self.state_else1,
+                "var": self.state_variable,
+            },
+            "state_else1": {
+                "e": self.state_else2,
+                "var": self.state_variable,
+            },
+            "state_else2": {
+                "var": self.state_variable,
+                "else": self.state_ELS,
+            },
             "state_in0": {
                 "n": self.state_in1,
+                "f": self.state_if0,
                 "var": self.state_variable,
             },
             "state_in1": {
                 "var": self.state_variable,
                 "else": self.state_IN,
+            },
+            "state_if0": {
+                "var": self.state_variable,
+                "else": self.state_IF,
             },
             "state_single_comment0": {
                 "-": self.state_single_comment1,
@@ -161,6 +206,7 @@ class Lexer:
             },
             "state_true0": {
                 "r": self.state_true1,
+                "h": self.state_then0,
                 "var": self.state_variable,
             },
             "state_true1": {
@@ -174,6 +220,19 @@ class Lexer:
             "state_true3": {
                 "var": self.state_variable,
                 "else": self.state_TRU,
+            },
+
+            "state_then0": {
+                "e": self.state_then1,
+                "var": self.state_variable,
+            },
+            "state_then1": {
+                "n": self.state_then2,
+                "var": self.state_variable,
+            },
+            "state_then2": {
+                "var": self.state_variable,
+                "else": self.state_THN,
             },
             "state_false0": {
                 "a": self.state_false1,
@@ -286,14 +345,30 @@ class Lexer:
     def state_LET(self):
         self.cur_pos += 1
         return "start", None, Token("let", TokenType.LET)
+    
+    def state_AND(self):
+        self.cur_pos += 1
+        return "start", None, Token("and", TokenType.AND)
+    
+    def state_ORX(self):
+        self.cur_pos += 1
+        return "start", None, Token("or", TokenType.ORX)
 
     def state_END(self):
         self.cur_pos += 1
         return "start", None, Token("end", TokenType.END)
 
+    def state_ELS(self):
+        self.cur_pos += 1
+        return "start", None, Token("else", TokenType.ELS)
+
     def state_IN(self):
         self.cur_pos += 1
         return "start", None, Token("in", TokenType.INX)
+
+    def state_IF(self):
+        self.cur_pos += 1
+        return "start", None, Token("if", TokenType.IFX)
 
     def state_NOT(self):
         self.cur_pos += 1
@@ -302,6 +377,10 @@ class Lexer:
     def state_TRU(self):
         self.cur_pos += 1
         return "start", None, Token("true", TokenType.TRU)
+
+    def state_THN(self):
+        self.cur_pos += 1
+        return "start", None, Token("then", TokenType.THN)
 
     def state_FLS(self):
         self.cur_pos += 1
@@ -421,14 +500,14 @@ class Lexer:
 
     def state_let0(self):
         if self.cur_pos + 1 >= self.length:
-            return "start", "else", None
+            return "state_let0", "var", None
 
         self.cur_pos += 1
         cur_char = self.source[self.cur_pos]
         if cur_char == "e":
             return "state_let0", "e", None
 
-        if cur_char in Lexer.var_characters:
+        if cur_char in Lexer.var_characters or cur_char.isspace():
             return "state_let0", "var", None
 
         return "start", "else", None
@@ -442,7 +521,7 @@ class Lexer:
         if cur_char == "t":
             return "state_let1", "t", None
 
-        if cur_char in Lexer.var_characters:
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
             return "state_let1", "var", None
 
         return "start", "else", None
@@ -456,35 +535,106 @@ class Lexer:
         if cur_char.isspace() or cur_char == "(":
             return "state_let2", "else", None
 
-        if cur_char in Lexer.var_characters:
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
             return "state_let2", "var", None
 
         return "start", "else", None
-
-    def state_end0(self):
+    
+    def state_and0(self):
         if self.cur_pos + 1 >= self.length:
-            return "start", "else", None
+            return "state_and0", "var", None
 
         self.cur_pos += 1
         cur_char = self.source[self.cur_pos]
         if cur_char == "n":
-            return "state_end0", "n", None
+            return "state_and0", "n", None
 
-        if cur_char in Lexer.var_characters:
-            return "state_end0", "var", None
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
+            return "state_and0", "var", None
 
         return "start", "else", None
 
-    def state_end1(self):
+    def state_and1(self):
         if self.cur_pos + 1 >= self.length:
             return "start", "else", None
 
         self.cur_pos += 1
         cur_char = self.source[self.cur_pos]
         if cur_char == "d":
+            return "state_and1", "d", None
+
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
+            return "state_and1", "var", None
+
+        return "start", "else", None
+
+    def state_and2(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_and2", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char.isspace() or cur_char == "(":
+            return "state_and2", "else", None
+
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
+            return "state_and2", "var", None
+
+        return "start", "else", None
+    
+    def state_or0(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_or0", "var", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char == "r":
+            return "state_or0", "r", None
+
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
+            return "state_or0", "var", None
+
+        return "start", "else", None
+
+
+    def state_or1(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_or1", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char.isspace() or cur_char == "(":
+            return "state_or1", "else", None
+
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
+            return "state_or1", "var", None
+
+        return "start", "else", None
+
+    def state_end0(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_end0", "var", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char == "n" or cur_char == "l":
+            return "state_end0", cur_char, None
+
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
+            return "state_end0", "var", None
+
+        return "start", "else", None
+
+    def state_end1(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_end1", "var", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char == "d":
             return "state_end1", "d", None
 
-        if cur_char in Lexer.var_characters:
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
             return "state_end1", "var", None
 
         return "start", "else", None
@@ -498,21 +648,63 @@ class Lexer:
         if cur_char.isspace() or cur_char == "(":
             return "state_end2", "else", None
 
-        if cur_char in Lexer.var_characters:
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
             return "state_end2", "var", None
+
+        return "start", "else", None
+
+    def state_else0(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_else0", "var", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char == "s":
+            return "state_else0", "s", None
+
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
+            return "state_else0", "var", None
+
+        return "start", "else", None
+
+    def state_else1(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_else1", "var", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char == "e":
+            return "state_else1", "e", None
+
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
+            return "state_else1", "var", None
+
+        return "start", "else", None
+
+    def state_else2(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_else2", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char.isspace() or cur_char == "(":
+            return "state_else2", "else", None
+
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
+            return "state_else2", "var", None
 
         return "start", "else", None
 
     def state_in0(self):
         if self.cur_pos + 1 >= self.length:
-            return "start", "else", None
+            return "state_in0", "var", None
 
         self.cur_pos += 1
         cur_char = self.source[self.cur_pos]
-        if cur_char == "n":
-            return "state_in0", "n", None
+        if cur_char == "n" or cur_char == "f":
+            return "state_in0", cur_char, None
 
-        if cur_char in Lexer.var_characters:
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
             return "state_in0", "var", None
 
         return "start", "else", None
@@ -526,30 +718,50 @@ class Lexer:
         if cur_char.isspace() or cur_char == "(":
             return "state_in1", "else", None
 
-        if cur_char in Lexer.var_characters:
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
             return "state_in1", "var", None
+
+        return "start", "else", None
+
+    def state_if0(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_if0", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char.isspace() or cur_char == "(":
+            return "state_if0", "else", None
+
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
+            return "state_if0", "var", None
 
         return "start", "else", None
 
     def state_not0(self):
         if self.cur_pos + 1 >= self.length:
-            return "start", "else", None
+            return "state_not0", "else", None
 
         self.cur_pos += 1
         cur_char = self.source[self.cur_pos]
         if cur_char == "o":
             return "state_not0", "o", None
+        
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
+            return "state_not0", "var", None
 
         return "start", "else", None
 
     def state_not1(self):
         if self.cur_pos + 1 >= self.length:
-            return "start", "else", None
+            return "state_not1", "var", None
 
         self.cur_pos += 1
         cur_char = self.source[self.cur_pos]
         if cur_char == "t":
             return "state_not1", "t", None
+        
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
+            return "state_not1", "var", None
 
         return "start", "else", None
 
@@ -566,34 +778,43 @@ class Lexer:
 
     def state_true0(self):
         if self.cur_pos + 1 >= self.length:
-            return "start", "else", None
+            return "state_true0", "var", None
 
         self.cur_pos += 1
         cur_char = self.source[self.cur_pos]
-        if cur_char == "r":
-            return "state_true0", "r", None
+        if cur_char == "r" or cur_char == "h":
+            return "state_true0", cur_char, None
+        
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
+            return "state_true0", "var", None
 
         return "start", "else", None
 
     def state_true1(self):
         if self.cur_pos + 1 >= self.length:
-            return "start", "else", None
+            return "state_true1", "var", None
 
         self.cur_pos += 1
         cur_char = self.source[self.cur_pos]
         if cur_char == "u":
             return "state_true1", "u", None
+        
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
+            return "state_true1", "var", None
 
         return "start", "else", None
 
     def state_true2(self):
         if self.cur_pos + 1 >= self.length:
-            return "start", "else", None
+            return "state_true2", "var", None
 
         self.cur_pos += 1
         cur_char = self.source[self.cur_pos]
         if cur_char == "e":
             return "state_true2", "e", None
+        
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
+            return "state_true2", "var", None
 
         return "start", "else", None
 
@@ -609,47 +830,99 @@ class Lexer:
 
         return "start", "else", None
 
+    def state_then0(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_then0", "var", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char == "e":
+            return "state_then0", "e", None
+        
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
+            return "state_then0", "var", None
+
+        return "start", "else", None
+
+    def state_then1(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_then1", "var", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char == "n":
+            return "state_then1", "n", None
+        
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
+            return "state_then1", "var", None
+
+        return "start", "else", None
+
+    def state_then2(self):
+        if self.cur_pos + 1 >= self.length:
+            return "state_then2", "else", None
+
+        self.cur_pos += 1
+        cur_char = self.source[self.cur_pos]
+        if cur_char.isspace() or cur_char in "()":
+            self.cur_pos -= 1
+            return "state_then2", "else", None
+
+        return "start", "else", None
+
     def state_false0(self):
         if self.cur_pos + 1 >= self.length:
-            return "start", "else", None
+            return "state_false0", "var", None
 
         self.cur_pos += 1
         cur_char = self.source[self.cur_pos]
         if cur_char == "a":
             return "state_false0", "a", None
+        
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
+            return "state_false0", "var", None
 
         return "start", "else", None
 
     def state_false1(self):
         if self.cur_pos + 1 >= self.length:
-            return "start", "else", None
+            return "state_false1", "var", None
 
         self.cur_pos += 1
         cur_char = self.source[self.cur_pos]
         if cur_char == "l":
             return "state_false1", "l", None
+        
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
+            return "state_false1", "var", None
 
         return "start", "else", None
 
     def state_false2(self):
         if self.cur_pos + 1 >= self.length:
-            return "start", "else", None
+            return "state_false2", "var", None
 
         self.cur_pos += 1
         cur_char = self.source[self.cur_pos]
         if cur_char == "s":
             return "state_false2", "s", None
+        
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
+            return "state_false2", "var", None
 
         return "start", "else", None
 
     def state_false3(self):
         if self.cur_pos + 1 >= self.length:
-            return "start", "else", None
+            return "state_false3", "var", None
 
         self.cur_pos += 1
         cur_char = self.source[self.cur_pos]
         if cur_char == "e":
             return "state_false3", "e", None
+        
+        if cur_char in Lexer.var_characters  or cur_char.isspace():
+            return "state_false3", "var", None
 
         return "start", "else", None
 
