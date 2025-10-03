@@ -77,138 +77,255 @@ class Visitor(ABC):
         pass
 
 
-class EvalVisitor(Visitor):
+class CtrGenVisitor(Visitor):
     """
-    The EvalVisitor class evaluates logical and arithmetic expressions. The
-    result of evaluating an expression is the value of that expression. The
-    inherited attribute propagated throughout visits is the environment that
-    associates the names of variables with values.
+    This visitor creates constraints for a type-inference engine. Basically,
+    it traverses the abstract-syntax tree of expressions, producing pairs like
+    (type0, type1) on the way. A pair like (type0, type1) indicates that these
+    two type variables are the same.
 
     Examples:
-    >>> e0 = Let('v', Add(Num(40), Num(2)), Mul(Var('v'), Var('v')))
-    >>> e1 = Not(Eql(e0, Num(1764)))
-    >>> ev = EvalVisitor()
-    >>> e1.accept(ev, {})
-    False
-
-    >>> e0 = Let('v', Add(Num(40), Num(2)), Sub(Var('v'), Num(2)))
-    >>> e1 = Lth(e0, Var('x'))
-    >>> ev = EvalVisitor()
-    >>> e1.accept(ev, {'x': 41})
-    True
+        >>> e = Let('v', Num(40), Let('w', Num(2), Add(Var('v'), Var('w'))))
+        >>> ev = CtrGenVisitor()
+        >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
+        ["('TV_1', 'TV_2')", "('TV_2', 'TV_3')", "('v', <class 'int'>)", "('w', <class 'int'>)", "(<class 'int'>, 'TV_3')", "(<class 'int'>, 'v')", "(<class 'int'>, 'w')"]
     """
 
-    def visit_var(self, exp, env):
-        if exp.identifier in env:
-            return env[exp.identifier]
+    def __init__(self):
+        self.fresh_type_counter = 0
 
-        sys.exit(f"Def error")
+    def fresh_type_var(self):
+        """
+        Create a new type var using the current value of the fresh_type_counter.
+        Two successive calls to this method will return different type names.
+        Notice that the name of a type variable is always TV_x, where x is
+        some integer number. That means that probably we would run into
+        errors if someone declares a variable called, say, TV_1 or TV_2, as in
+        "let TV_1 <- 1 in TV_1 end". But you can assume that such would never
+        happen in the test cases. In practice, we should define a new class
+        to represent type variables. But let's keep the implementation as
+        simple as possible.
 
-    def visit_bln(self, exp, env):
-        return exp.bln
+        Example:
+            >>> ev = CtrGenVisitor()
+            >>> [ev.fresh_type_var(), ev.fresh_type_var()]
+            ['TV_1', 'TV_2']
+        """
+        self.fresh_type_counter += 1
+        return f"TV_{self.fresh_type_counter}"
 
-    def visit_num(self, exp, env):
-        return exp.num
+    """
+    The CtrGenVisitor class creates constraints that, once solved, will give
+    us the type of the different variables. Every accept method takes in
+    two arguments (in addition to self):
+    
+    exp: is the expression that is being analyzed.
+    type_var: that is a name that works as a placeholder for the type of the
+    expression. Whenever we visit a new expression, we create a type variable
+    to represent its type (you can do that with the method fresh_type_var).
+    The only exception is the type of Var expressions. In this case, the type
+    of a Var expression is the identifier of that expression.
+    """
 
-    def visit_eql(self, exp, env):
-        val_left = exp.left.accept(self, env)
-        val_right = exp.right.accept(self, env)
-        type_val_left = type(val_left)
-        type_val_right = type(val_right)
-        if (
-            (type_val_left == type(1) or type_val_left == type(True))
-            and type_val_left == type_val_right
-        ):
-            return val_left == val_right
-        sys.exit("Type error")
+    def visit_var(self, exp, type_var):
+        """
+        Example:
+            >>> e = Var('v')
+            >>> ev = CtrGenVisitor()
+            >>> e.accept(ev, ev.fresh_type_var())
+            {('v', 'TV_1')}
+        """
+        return {(exp.identifier, type_var)}
 
-    def visit_and(self, exp, env):
-        val_left = exp.left.accept(self, env)
-        if type(val_left) != type(True):
-            sys.exit("Type error")
-        if not val_left:
-            return False
-        val_right = exp.right.accept(self, env)
-        if type(val_right) != type(True):
-            sys.exit("Type error")
-        return val_right
+    def visit_bln(self, exp, type_var):
+        """
+        Example:
+            >>> e = Bln(True)
+            >>> ev = CtrGenVisitor()
+            >>> e.accept(ev, ev.fresh_type_var())
+            {(<class 'bool'>, 'TV_1')}
+        """
+        return {(type(True), type_var)}
 
-    def visit_or(self, exp, env):
-        val_left = exp.left.accept(self, env)
-        if type(val_left) != type(True):
-            sys.exit("Type error")
-        if val_left:
-            return True
-        val_right = exp.right.accept(self, env)
-        if type(val_right) != type(True):
-            sys.exit("Type error")
-        return val_right
+    def visit_num(self, exp, type_var):
+        """
+        Example:
+            >>> e = Num(1)
+            >>> ev = CtrGenVisitor()
+            >>> e.accept(ev, ev.fresh_type_var())
+            {(<class 'int'>, 'TV_1')}
+        """
+        return {(type(1), type_var)}
 
-    def visit_add(self, exp, env):
-        val_left = exp.left.accept(self, env)
-        val_right = exp.right.accept(self, env)
-        if type(val_left) == type(1) and type(val_right) == type(1):
-            return val_left + val_right
-        sys.exit("Type error")
+    def visit_eql(self, exp, type_var):
+        """
+        Example:
+            >>> e = Eql(Num(1), Bln(True))
+            >>> ev = CtrGenVisitor()
+            >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
+            ["(<class 'bool'>, 'TV_1')", "(<class 'bool'>, 'TV_2')", "(<class 'int'>, 'TV_2')"]
 
-    def visit_sub(self, exp, env):
-        val_left = exp.left.accept(self, env)
-        val_right = exp.right.accept(self, env)
-        if type(val_left) == type(1) and type(val_right) == type(1):
-            return val_left - val_right
-        sys.exit("Type error")
+        Notice that if we have repeated constraints, they only appear once in
+        the set of constraints (after all, it's a set!). As an example, we
+        would have two occurrences of the pair (TV_2, int) in the following
+        example:
+            >>> e = Eql(Num(1), Num(2))
+            >>> ev = CtrGenVisitor()
+            >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
+            ["(<class 'bool'>, 'TV_1')", "(<class 'int'>, 'TV_2')"]
+        """
+        fresh_type_var = self.fresh_type_var()
+        crts_left = exp.left.accept(self, fresh_type_var)
+        crts_right = exp.right.accept(self, fresh_type_var)
+        return crts_left | crts_right | {(type(True), type_var)}
 
-    def visit_mul(self, exp, env):
-        val_left = exp.left.accept(self, env)
-        val_right = exp.right.accept(self, env)
-        if type(val_left) == type(1) and type(val_right) == type(1):
-            return val_left * val_right
-        sys.exit("Type error")
+    def visit_and(self, exp, type_var):
+        """
+        Example:
+            >>> e = And(Bln(False), Bln(True))
+            >>> ev = CtrGenVisitor()
+            >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
+            ["(<class 'bool'>, 'TV_1')", "(<class 'bool'>, <class 'bool'>)"]
 
-    def visit_div(self, exp, env):
-        val_left = exp.left.accept(self, env)
-        val_right = exp.right.accept(self, env)
-        if type(val_left) == type(1) and type(val_right) == type(1):
-            return val_left // val_right
-        sys.exit("Type error")
+        In the above example, notice that we ended up getting a trivial
+        constraint, e.g.: (<class 'bool'>, <class 'bool'>). That's alright:
+        don't worry about these trivial constraints at this point. We can
+        remove them from the set of constraints later on, when we try to
+        solve them.
+        """
+        crts_left = exp.left.accept(self, type(True))
+        crts_right = exp.right.accept(self, type(True))
+        return crts_left | crts_right | {(type(True), type_var)}
 
-    def visit_leq(self, exp, env):
-        val_left = exp.left.accept(self, env)
-        val_right = exp.right.accept(self, env)
-        if type(val_left) == type(1) and type(val_right) == type(1):
-            return val_left <= val_right
-        sys.exit("Type error")
+    def visit_or(self, exp, type_var):
+        """
+        Example:
+            >>> e = Or(Bln(False), Bln(True))
+            >>> ev = CtrGenVisitor()
+            >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
+            ["(<class 'bool'>, 'TV_1')", "(<class 'bool'>, <class 'bool'>)"]
+        """
+        crts_left = exp.left.accept(self, type(True))
+        crts_right = exp.right.accept(self, type(True))
+        return crts_left | crts_right | {(type(True), type_var)}
 
-    def visit_lth(self, exp, env):
-        val_left = exp.left.accept(self, env)
-        val_right = exp.right.accept(self, env)
-        if type(val_left) == type(1) and type(val_right) == type(1):
-            return val_left < val_right
-        sys.exit("Type error")
+    def visit_add(self, exp, type_var):
+        """
+        Example:
+            >>> e = Add(Num(1), Num(2))
+            >>> ev = CtrGenVisitor()
+            >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
+            ["(<class 'int'>, 'TV_1')", "(<class 'int'>, <class 'int'>)"]
+        """
+        crts_left = exp.left.accept(self, type(1))
+        crts_right = exp.right.accept(self, type(1))
+        return crts_left | crts_right | {(type(1), type_var)}
 
-    def visit_neg(self, exp, env):
-        val = exp.exp.accept(self, env)
-        if type(val) == type(1):
-            return -val
-        sys.exit("Type error")
+    def visit_sub(self, exp, type_var):
+        """
+        Example:
+            >>> e = Sub(Num(1), Num(2))
+            >>> ev = CtrGenVisitor()
+            >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
+            ["(<class 'int'>, 'TV_1')", "(<class 'int'>, <class 'int'>)"]
+        """
+        crts_left = exp.left.accept(self, type(1))
+        crts_right = exp.right.accept(self, type(1))
+        return crts_left | crts_right | {(type(1), type_var)}
 
-    def visit_not(self, exp, env):
-        val = exp.exp.accept(self, env)
-        if type(val) == type(True):
-            return not val
-        sys.exit("Type error")
+    def visit_mul(self, exp, type_var):
+        """
+        Example:
+            >>> e = Mul(Num(1), Num(2))
+            >>> ev = CtrGenVisitor()
+            >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
+            ["(<class 'int'>, 'TV_1')", "(<class 'int'>, <class 'int'>)"]
+        """
+        crts_left = exp.left.accept(self, type(1))
+        crts_right = exp.right.accept(self, type(1))
+        return crts_left | crts_right | {(type(1), type_var)}
 
-    def visit_let(self, exp, env):
-        e0_val = exp.exp_def.accept(self, env)
-        new_env = dict(env)
-        new_env[exp.identifier] = e0_val
-        return exp.exp_body.accept(self, new_env)
+    def visit_div(self, exp, type_var):
+        """
+        Example:
+            >>> e = Div(Num(1), Num(2))
+            >>> ev = CtrGenVisitor()
+            >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
+            ["(<class 'int'>, 'TV_1')", "(<class 'int'>, <class 'int'>)"]
+        """
+        crts_left = exp.left.accept(self, type(1))
+        crts_right = exp.right.accept(self, type(1))
+        return crts_left | crts_right | {(type(1), type_var)}
 
-    def visit_ifThenElse(self, exp, env):
-        cond_val = exp.cond.accept(self, env)
-        if type(cond_val) != type(True):
-            sys.exit("Type error")
-        if cond_val:
-            return exp.e0.accept(self, env)
-        else:
-            return exp.e1.accept(self, env)
+    def visit_leq(self, exp, type_var):
+        """
+        Example:
+            >>> e = Leq(Num(1), Num(2))
+            >>> ev = CtrGenVisitor()
+            >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
+            ["(<class 'bool'>, 'TV_1')", "(<class 'int'>, <class 'int'>)"]
+        """
+        crts_left = exp.left.accept(self, type(1))
+        crts_right = exp.right.accept(self, type(1))
+        return crts_left | crts_right | {(type(True), type_var)}
+
+    def visit_lth(self, exp, type_var):
+        """
+        Example:
+            >>> e = Lth(Num(1), Num(2))
+            >>> ev = CtrGenVisitor()
+            >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
+            ["(<class 'bool'>, 'TV_1')", "(<class 'int'>, <class 'int'>)"]
+        """
+        crts_left = exp.left.accept(self, type(1))
+        crts_right = exp.right.accept(self, type(1))
+        return crts_left | crts_right | {(type(True), type_var)}
+
+    def visit_neg(self, exp, type_var):
+        """
+        Example:
+            >>> e = Neg(Num(1))
+            >>> ev = CtrGenVisitor()
+            >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
+            ["(<class 'int'>, 'TV_1')", "(<class 'int'>, <class 'int'>)"]
+        """
+        crts = exp.exp.accept(self, type(1))
+        return crts | {(type(1), type_var)}
+
+    def visit_not(self, exp, type_var):
+        """
+        Example:
+            >>> e = Not(Bln(True))
+            >>> ev = CtrGenVisitor()
+            >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
+            ["(<class 'bool'>, 'TV_1')", "(<class 'bool'>, <class 'bool'>)"]
+        """
+        crts = exp.exp.accept(self, type(True))
+        return crts | {(type(True), type_var)}
+
+    def visit_let(self, exp, type_var):
+        """
+        Example:
+            >>> e = Let('v', Num(42), Var('v'))
+            >>> ev = CtrGenVisitor()
+            >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
+            ["('TV_1', 'TV_2')", "('v', 'TV_2')", "(<class 'int'>, 'v')"]
+        """
+        fresh_type_var = self.fresh_type_var()
+        crts_def = exp.exp_def.accept(self, exp.identifier)
+        crts_body = exp.exp_body.accept(self, fresh_type_var)
+        return crts_def | crts_body | {(type_var, fresh_type_var)}
+
+    def visit_ifThenElse(self, exp, type_var):
+        """
+        Example:
+            >>> e = IfThenElse(Bln(True), Num(42), Num(30))
+            >>> ev = CtrGenVisitor()
+            >>> sorted([str(ct) for ct in e.accept(ev, ev.fresh_type_var())])
+            ["('TV_1', 'TV_2')", "(<class 'bool'>, <class 'bool'>)", "(<class 'int'>, 'TV_2')"]
+        """
+        fresh_type_var = self.fresh_type_var()
+        crts_cond = exp.cond.accept(self, type(True))
+        crts_e0 = exp.e0.accept(self, fresh_type_var)
+        crts_e1 = exp.e1.accept(self, fresh_type_var)
+        return crts_cond | crts_e0 | crts_e1 | {(type_var, fresh_type_var)}
