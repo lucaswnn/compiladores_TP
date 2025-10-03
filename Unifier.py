@@ -41,9 +41,18 @@ def unify(constraints, sets):
         >>> len(sets['b'])
         4
     """
-    # TODO: Implement this method!
-    raise NotImplementedError
+    if not constraints:
+        return sets
 
+    t0, t1 = constraints[0]
+    rest = constraints[1:]
+    if t0 != t1:
+        s0 = sets.setdefault(t0, set())
+        s1 = sets.setdefault(t1, set())
+        new_set = s0 | s1 | {t0, t1}
+        for t in new_set:
+            sets[t] = new_set
+    return unify(rest, sets)
 
 
 def name_sets(sets):
@@ -68,9 +77,18 @@ def name_sets(sets):
         [<class 'int'>, <class 'bool'>]
     """
 
-    # TODO: Implement this method!
-    raise NotImplementedError
+    def canonicalize(s):
+        aux = set(s)
+        for e in aux:
+            if not isinstance(e, type):
+                s.remove(e)
+        if len(s) == 0 or len(s) > 1:
+            sys.exit("Type error")
 
+    for s in sets.values():
+        canonicalize(s)
+
+    return {key: list(value)[0] for key, value in sets.items()}
 
 
 def infer_types(expression):
