@@ -53,11 +53,13 @@ class TokenType(enum.Enum):
     IFX = 215  # The 'if' of a conditional expression
     THN = 216  # The 'then' of a conditional expression
     ELS = 217  # The 'else' of a conditional expression
+    FNX = 218  # The 'fn' that declares an anonymous function
+    ARW = 219  # The '=>' that separates the parameter from the body of function
 
 
 class Lexer:
-
     var_characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
+    whitespace_characters = " \t\r"
 
     def __init__(self, source):
         if source is None or source == "":
@@ -69,104 +71,220 @@ class Lexer:
         self.buffer = ""
         self.state_table = self.state_table()
 
+    def consumeChar(self):
+        if self.cur_pos >= self.length:
+            return None
+
+        cur_char = self.source[self.cur_pos]
+        self.buffer += cur_char
+        self.cur_pos += 1
+        return cur_char
+
+    def getChar(self):
+        if self.cur_pos >= self.length:
+            return None
+
+        return self.source[self.cur_pos]
+
     def state_table(self):
         return {
             "start": {
                 "\n": self.state_NLN,
                 " ": self.state_WSP,
-                "=": self.state_EQL,
+                "\t": self.state_WSP,
+                "\r": self.state_WSP,
+                "=": self.state_eql_or_arw,
                 "+": self.state_ADD,
                 "*": self.state_MUL,
                 "/": self.state_DIV,
                 "~": self.state_NEG,
                 ")": self.state_RPR,
-                "-": self.state_single_comment0,
-                "(": self.state_left_parenthesis,
+                "-": self.state_single_comment_or_sub,
+                "(": self.state_left_parenthesis_or_full_comment,
                 "<": self.state_less_eq_or_assign,
                 "n": self.state_not0,
-                "t": self.state_true0,
-                "f": self.state_false0,
+                "t": self.state_true_or_then,
+                "f": self.state_false_or_fn,
                 "l": self.state_let0,
-                "e": self.state_end0,
+                "e": self.state_end_or_else,
                 "o": self.state_or0,
                 "a": self.state_and0,
-                "i": self.state_in0,
+                "i": self.state_in_or_if,
                 "0": self.state_zero,
-                "digit_not_zero": self.state_integer,
-                "alpha": self.state_variable,
-                "else": self.state_error
+                "1": self.state_integer,
+                "2": self.state_integer,
+                "3": self.state_integer,
+                "4": self.state_integer,
+                "5": self.state_integer,
+                "6": self.state_integer,
+                "7": self.state_integer,
+                "8": self.state_integer,
+                "9": self.state_integer,
+                "else": self.state_variable
+            },
+            "state_eql_or_arw": {
+                ">": self.state_ARW,
+                "else": self.state_EQL,
             },
             "state_let0": {
                 "e": self.state_let1,
-                "var": self.state_variable,
+                "(": self.state_VAR,
+                ")": self.state_VAR,
+                " ": self.state_VAR,
+                "\n": self.state_VAR,
+                "\t": self.state_VAR,
+                "\r": self.state_VAR,
+                "else": self.state_variable,
             },
             "state_let1": {
                 "t": self.state_let2,
-                "var": self.state_variable,
+                "(": self.state_VAR,
+                ")": self.state_VAR,
+                " ": self.state_VAR,
+                "\n": self.state_VAR,
+                "\t": self.state_VAR,
+                "\r": self.state_VAR,
+                "else": self.state_variable,
             },
             "state_let2": {
-                "var": self.state_variable,
-                "else": self.state_LET,
+                " ": self.state_LET,
+                "\n": self.state_LET,
+                "\t": self.state_LET,
+                "\r": self.state_LET,
+                "else": self.state_variable,
             },
             "state_and0": {
                 "n": self.state_and1,
-                "var": self.state_variable,
+                "(": self.state_VAR,
+                ")": self.state_VAR,
+                " ": self.state_VAR,
+                "\n": self.state_VAR,
+                "\t": self.state_VAR,
+                "\r": self.state_VAR,
+                "else": self.state_variable,
             },
             "state_and1": {
                 "d": self.state_and2,
-                "var": self.state_variable,
+                "(": self.state_VAR,
+                ")": self.state_VAR,
+                " ": self.state_VAR,
+                "\n": self.state_VAR,
+                "\t": self.state_VAR,
+                "\r": self.state_VAR,
+                "else": self.state_variable,
             },
             "state_and2": {
-                "var": self.state_variable,
-                "else": self.state_AND,
+                "(": self.state_AND,
+                " ": self.state_AND,
+                "\n": self.state_AND,
+                "\t": self.state_AND,
+                "\r": self.state_AND,
+                "else": self.state_variable,
             },
             "state_or0": {
                 "r": self.state_or1,
-                "var": self.state_variable,
+                "(": self.state_VAR,
+                ")": self.state_VAR,
+                " ": self.state_VAR,
+                "\n": self.state_VAR,
+                "\t": self.state_VAR,
+                "\r": self.state_VAR,
+                "else": self.state_variable,
             },
             "state_or1": {
-                "var": self.state_variable,
-                "else": self.state_ORX,
+                "(": self.state_ORX,
+                " ": self.state_ORX,
+                "\n": self.state_ORX,
+                "\t": self.state_ORX,
+                "\r": self.state_ORX,
+                "else": self.state_variable,
             },
-            "state_end0": {
+            "state_end_or_else": {
                 "n": self.state_end1,
-                "l": self.state_else0,
-                "var": self.state_variable,
+                "l": self.state_else1,
+                "(": self.state_VAR,
+                ")": self.state_VAR,
+                " ": self.state_VAR,
+                "\n": self.state_VAR,
+                "\t": self.state_VAR,
+                "\r": self.state_VAR,
+                "else": self.state_variable,
             },
             "state_end1": {
                 "d": self.state_end2,
-                "var": self.state_variable,
+                "(": self.state_VAR,
+                ")": self.state_VAR,
+                " ": self.state_VAR,
+                "\n": self.state_VAR,
+                "\t": self.state_VAR,
+                "\r": self.state_VAR,
+                "else": self.state_variable,
             },
             "state_end2": {
-                "var": self.state_variable,
-                "else": self.state_END,
-            },
-            "state_else0": {
-                "s": self.state_else1,
-                "var": self.state_variable,
+                "(": self.state_END,
+                ")": self.state_END,
+                " ": self.state_END,
+                "\n": self.state_END,
+                "\t": self.state_END,
+                "\r": self.state_END,
+                "else": self.state_variable,
             },
             "state_else1": {
-                "e": self.state_else2,
-                "var": self.state_variable,
+                "s": self.state_else2,
+                "(": self.state_VAR,
+                ")": self.state_VAR,
+                " ": self.state_VAR,
+                "\n": self.state_VAR,
+                "\t": self.state_VAR,
+                "\r": self.state_VAR,
+                "else": self.state_variable,
             },
             "state_else2": {
-                "var": self.state_variable,
-                "else": self.state_ELS,
+                "e": self.state_else3,
+                "(": self.state_VAR,
+                ")": self.state_VAR,
+                " ": self.state_VAR,
+                "\n": self.state_VAR,
+                "\t": self.state_VAR,
+                "\r": self.state_VAR,
+                "else": self.state_variable,
             },
-            "state_in0": {
+            "state_else3": {
+                "(": self.state_ELS,
+                " ": self.state_ELS,
+                "\n": self.state_ELS,
+                "\t": self.state_ELS,
+                "\r": self.state_ELS,
+                "else": self.state_variable,
+            },
+            "state_in_or_if": {
                 "n": self.state_in1,
-                "f": self.state_if0,
-                "var": self.state_variable,
+                "f": self.state_if1,
+                "(": self.state_VAR,
+                ")": self.state_VAR,
+                " ": self.state_VAR,
+                "\n": self.state_VAR,
+                "\t": self.state_VAR,
+                "\r": self.state_VAR,
+                "else": self.state_variable,
             },
             "state_in1": {
-                "var": self.state_variable,
-                "else": self.state_IN,
+                "(": self.state_INX,
+                " ": self.state_INX,
+                "\n": self.state_INX,
+                "\t": self.state_INX,
+                "\r": self.state_INX,
+                "else": self.state_variable,
             },
-            "state_if0": {
-                "var": self.state_variable,
-                "else": self.state_IF,
+            "state_if1": {
+                "(": self.state_IFX,
+                " ": self.state_IFX,
+                "\n": self.state_IFX,
+                "\t": self.state_IFX,
+                "\r": self.state_IFX,
+                "else": self.state_variable,
             },
-            "state_single_comment0": {
+            "state_single_comment_or_sub": {
                 "-": self.state_single_comment1,
                 "else": self.state_SUB,
             },
@@ -174,885 +292,897 @@ class Lexer:
                 "\n": self.state_single_COM,
                 "else": self.state_single_comment1,
             },
-            "state_full_comment0": {
-                "*": self.state_full_comment1,
-                "else": self.state_full_comment0,
-            },
             "state_full_comment1": {
-                ")": self.state_full_COM,
-                "*": self.state_full_comment1,
-                "else": self.state_full_comment0,
+                "*": self.state_full_comment2,
+                "else": self.state_full_comment1,
             },
-            "state_left_parenthesis": {
-                "*": self.state_full_comment0,
+            "state_full_comment2": {
+                ")": self.state_full_COM,
+                "*": self.state_full_comment2,
+                "else": self.state_full_comment1,
+            },
+            "state_left_parenthesis_or_full_comment": {
+                "*": self.state_full_comment1,
                 "else": self.state_LPR,
             },
-            "state_less_eq": {
+            "state_less_eq_or_assign": {
                 "=": self.state_LEQ,
                 "-": self.state_ASN,
                 "else": self.state_LTH,
             },
             "state_not0": {
                 "o": self.state_not1,
-                "var": self.state_variable,
+                "(": self.state_VAR,
+                ")": self.state_VAR,
+                " ": self.state_VAR,
+                "\n": self.state_VAR,
+                "\t": self.state_VAR,
+                "\r": self.state_VAR,
+                "else": self.state_variable,
             },
             "state_not1": {
                 "t": self.state_not2,
-                "var": self.state_variable,
+                "(": self.state_VAR,
+                ")": self.state_VAR,
+                " ": self.state_VAR,
+                "\n": self.state_VAR,
+                "\t": self.state_VAR,
+                "\r": self.state_VAR,
+                "else": self.state_variable,
             },
             "state_not2": {
-                "var": self.state_variable,
-                "else": self.state_NOT,
+                "(": self.state_NOT,
+                " ": self.state_NOT,
+                "\n": self.state_NOT,
+                "\t": self.state_NOT,
+                "\r": self.state_NOT,
+                "else": self.state_variable,
             },
-            "state_true0": {
+            "state_true_or_then": {
                 "r": self.state_true1,
-                "h": self.state_then0,
-                "var": self.state_variable,
+                "h": self.state_then1,
+                "(": self.state_VAR,
+                ")": self.state_VAR,
+                " ": self.state_VAR,
+                "\n": self.state_VAR,
+                "\t": self.state_VAR,
+                "\r": self.state_VAR,
+                "else": self.state_variable,
             },
             "state_true1": {
                 "u": self.state_true2,
-                "var": self.state_variable,
+                "(": self.state_VAR,
+                ")": self.state_VAR,
+                " ": self.state_VAR,
+                "\n": self.state_VAR,
+                "\t": self.state_VAR,
+                "\r": self.state_VAR,
+                "else": self.state_variable,
             },
             "state_true2": {
                 "e": self.state_true3,
-                "var": self.state_variable,
+                "(": self.state_VAR,
+                ")": self.state_VAR,
+                " ": self.state_VAR,
+                "\n": self.state_VAR,
+                "\t": self.state_VAR,
+                "\r": self.state_VAR,
+                "else": self.state_variable,
             },
             "state_true3": {
-                "var": self.state_variable,
-                "else": self.state_TRU,
-            },
-
-            "state_then0": {
-                "e": self.state_then1,
-                "var": self.state_variable,
+                "(": self.state_TRU,
+                ")": self.state_TRU,
+                " ": self.state_TRU,
+                "\n": self.state_TRU,
+                "\t": self.state_TRU,
+                "\r": self.state_TRU,
+                "else": self.state_variable,
             },
             "state_then1": {
-                "n": self.state_then2,
-                "var": self.state_variable,
+                "e": self.state_then2,
+                "(": self.state_VAR,
+                ")": self.state_VAR,
+                " ": self.state_VAR,
+                "\n": self.state_VAR,
+                "\t": self.state_VAR,
+                "\r": self.state_VAR,
+                "else": self.state_variable,
             },
             "state_then2": {
-                "var": self.state_variable,
-                "else": self.state_THN,
+                "n": self.state_then3,
+                "(": self.state_VAR,
+                ")": self.state_VAR,
+                " ": self.state_VAR,
+                "\n": self.state_VAR,
+                "\t": self.state_VAR,
+                "\r": self.state_VAR,
+                "else": self.state_variable,
             },
-            "state_false0": {
+            "state_then3": {
+                "(": self.state_THN,
+                " ": self.state_THN,
+                "\n": self.state_THN,
+                "\t": self.state_THN,
+                "\r": self.state_THN,
+                "else": self.state_variable,
+            },
+            "state_false_or_fn": {
                 "a": self.state_false1,
-                "var": self.state_variable,
+                "n": self.state_fn1,
+                "(": self.state_VAR,
+                ")": self.state_VAR,
+                " ": self.state_VAR,
+                "\n": self.state_VAR,
+                "\t": self.state_VAR,
+                "\r": self.state_VAR,
+                "else": self.state_variable,
             },
             "state_false1": {
                 "l": self.state_false2,
-                "var": self.state_variable,
+                "(": self.state_VAR,
+                ")": self.state_VAR,
+                " ": self.state_VAR,
+                "\n": self.state_VAR,
+                "\t": self.state_VAR,
+                "\r": self.state_VAR,
+                "else": self.state_variable,
             },
             "state_false2": {
                 "s": self.state_false3,
-                "var": self.state_variable,
+                "(": self.state_VAR,
+                ")": self.state_VAR,
+                " ": self.state_VAR,
+                "\n": self.state_VAR,
+                "\t": self.state_VAR,
+                "\r": self.state_VAR,
+                "else": self.state_variable,
             },
             "state_false3": {
                 "e": self.state_false4,
-                "var": self.state_variable,
+                "(": self.state_VAR,
+                ")": self.state_VAR,
+                " ": self.state_VAR,
+                "\n": self.state_VAR,
+                "\t": self.state_VAR,
+                "\r": self.state_VAR,
+                "else": self.state_variable,
             },
             "state_false4": {
-                "var": self.state_variable,
-                "else": self.state_FLS,
+                "(": self.state_FLS,
+                ")": self.state_FLS,
+                " ": self.state_FLS,
+                "\n": self.state_FLS,
+                "\t": self.state_FLS,
+                "\r": self.state_FLS,
+                "else": self.state_variable,
+            },
+            "state_fn1": {
+                " ": self.state_FNX,
+                "\n": self.state_FNX,
+                "\t": self.state_FNX,
+                "\r": self.state_FNX,
+                "else": self.state_variable,
             },
             "state_zero": {
-                "0-7": self.state_octal,
-                "x|X": self.state_hexadecimal,
-                "b|B": self.state_binary,
+                "0": self.state_octal,
+                "1": self.state_octal,
+                "2": self.state_octal,
+                "3": self.state_octal,
+                "4": self.state_octal,
+                "5": self.state_octal,
+                "6": self.state_octal,
+                "7": self.state_octal,
+                "x": self.state_hexadecimal,
+                "X": self.state_hexadecimal,
+                "b": self.state_binary,
+                "B": self.state_binary,
                 "else": self.state_INT,
             },
             "state_octal": {
-                "0-7": self.state_octal,
+                "0": self.state_octal,
+                "1": self.state_octal,
+                "2": self.state_octal,
+                "3": self.state_octal,
+                "4": self.state_octal,
+                "5": self.state_octal,
+                "6": self.state_octal,
+                "7": self.state_octal,
                 "else": self.state_OCT,
             },
             "state_hexadecimal": {
-                "0-9|a-f|A-F": self.state_hexadecimal,
+                "0": self.state_hexadecimal,
+                "1": self.state_hexadecimal,
+                "2": self.state_hexadecimal,
+                "3": self.state_hexadecimal,
+                "4": self.state_hexadecimal,
+                "5": self.state_hexadecimal,
+                "6": self.state_hexadecimal,
+                "7": self.state_hexadecimal,
+                "8": self.state_hexadecimal,
+                "9": self.state_hexadecimal,
+                "a": self.state_hexadecimal,
+                "b": self.state_hexadecimal,
+                "c": self.state_hexadecimal,
+                "d": self.state_hexadecimal,
+                "e": self.state_hexadecimal,
+                "f": self.state_hexadecimal,
+                "A": self.state_hexadecimal,
+                "B": self.state_hexadecimal,
+                "C": self.state_hexadecimal,
+                "D": self.state_hexadecimal,
+                "E": self.state_hexadecimal,
+                "F": self.state_hexadecimal,
                 "else": self.state_HEX,
             },
             "state_binary": {
-                "0|1": self.state_binary,
+                "0": self.state_binary,
+                "1": self.state_binary,
                 "else": self.state_BIN,
             },
             "state_integer": {
-                "0-9": self.state_integer,
+                "0": self.state_integer,
+                "1": self.state_integer,
+                "2": self.state_integer,
+                "3": self.state_integer,
+                "4": self.state_integer,
+                "5": self.state_integer,
+                "6": self.state_integer,
+                "7": self.state_integer,
+                "8": self.state_integer,
+                "9": self.state_integer,
                 "else": self.state_INT,
             },
             "state_variable": {
-                "var_characters": self.state_variable,
+                "continue": self.state_variable,
+                "(": self.state_VAR,
+                ")": self.state_VAR,
+                " ": self.state_VAR,
+                "\n": self.state_VAR,
+                "\t": self.state_VAR,
+                "\r": self.state_VAR,
                 "else": self.state_VAR,
-            }
+            },
         }
 
     def state_NLN(self):
-        self.cur_pos += 1
+        self.consumeChar()
         return "start", None, Token("\n", TokenType.NLN)
 
     def state_WSP(self):
-        self.cur_pos += 1
+        self.consumeChar()
         return "start", None, Token(" ", TokenType.WSP)
 
     def state_EQL(self):
-        self.cur_pos += 1
         return "start", None, Token("=", TokenType.EQL)
 
+    def state_FNX(self):
+        return "start", None, Token("fn", TokenType.FNX)
+
+    def state_ARW(self):
+        self.consumeChar()
+        return "start", None, Token("=>", TokenType.ARW)
+
     def state_ADD(self):
-        self.cur_pos += 1
+        self.consumeChar()
         return "start", None, Token("+", TokenType.ADD)
 
     def state_SUB(self):
-        self.cur_pos += 1
         return "start", None, Token("-", TokenType.SUB)
 
     def state_MUL(self):
-        self.cur_pos += 1
+        self.consumeChar()
         return "start", None, Token("*", TokenType.MUL)
 
     def state_DIV(self):
-        self.cur_pos += 1
+        self.consumeChar()
         return "start", None, Token("/", TokenType.DIV)
 
     def state_NEG(self):
-        self.cur_pos += 1
+        self.consumeChar()
         return "start", None, Token("~", TokenType.NEG)
 
     def state_LPR(self):
-        self.cur_pos += 1
         return "start", None, Token("(", TokenType.LPR)
 
     def state_RPR(self):
-        self.cur_pos += 1
+        self.consumeChar()
         return "start", None, Token(")", TokenType.RPR)
 
     def state_single_COM(self):
-        self.cur_pos += 1
         comment = f"--{self.buffer}"
-        self.buffer = ""
         return "start", None, Token(comment, TokenType.COM)
 
     def state_full_COM(self):
-        self.cur_pos += 1
-        comment = f"(*{self.buffer})"
-        self.buffer = ""
+        self.consumeChar()
+        comment = f"(*{self.buffer}*)"
         return "start", None, Token(comment, TokenType.COM)
 
     def state_LEQ(self):
-        self.cur_pos += 1
+        self.consumeChar()
         return "start", None, Token("<=", TokenType.LEQ)
 
     def state_LTH(self):
-        self.cur_pos += 1
         return "start", None, Token("<", TokenType.LTH)
 
     def state_LET(self):
-        self.cur_pos += 1
         return "start", None, Token("let", TokenType.LET)
-    
+
     def state_AND(self):
-        self.cur_pos += 1
         return "start", None, Token("and", TokenType.AND)
-    
+
     def state_ORX(self):
-        self.cur_pos += 1
         return "start", None, Token("or", TokenType.ORX)
 
     def state_END(self):
-        self.cur_pos += 1
         return "start", None, Token("end", TokenType.END)
 
     def state_ELS(self):
-        self.cur_pos += 1
         return "start", None, Token("else", TokenType.ELS)
 
-    def state_IN(self):
-        self.cur_pos += 1
+    def state_INX(self):
         return "start", None, Token("in", TokenType.INX)
 
-    def state_IF(self):
-        self.cur_pos += 1
+    def state_IFX(self):
         return "start", None, Token("if", TokenType.IFX)
 
     def state_NOT(self):
-        self.cur_pos += 1
         return "start", None, Token("not", TokenType.NOT)
 
     def state_TRU(self):
-        self.cur_pos += 1
         return "start", None, Token("true", TokenType.TRU)
 
     def state_THN(self):
-        self.cur_pos += 1
         return "start", None, Token("then", TokenType.THN)
 
     def state_FLS(self):
-        self.cur_pos += 1
         return "start", None, Token("false", TokenType.FLS)
 
+    def state_FNX(self):
+        return "start", None, Token("fn", TokenType.FNX)
+
     def state_INT(self):
-        self.cur_pos += 1
         number = self.buffer
-        self.buffer = ""
         return "start", None, Token(number, TokenType.NUM)
 
     def state_OCT(self):
-        self.cur_pos += 1
         number = self.buffer
-        self.buffer = ""
         return "start", None, Token(number, TokenType.OCT)
 
     def state_HEX(self):
-        self.cur_pos += 1
         number = self.buffer
-        self.buffer = ""
         return "start", None, Token(number, TokenType.HEX)
 
     def state_BIN(self):
-        self.cur_pos += 1
         number = self.buffer
-        self.buffer = ""
         return "start", None, Token(number, TokenType.BIN)
 
     def state_VAR(self):
-        self.cur_pos += 1
         var = self.buffer
-        self.buffer = ""
         return "start", None, Token(var, TokenType.VAR)
 
     def state_ASN(self):
-        self.cur_pos += 1
+        self.consumeChar()
         return "start", None, Token("<-", TokenType.ASN)
 
-    def state_single_comment0(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_single_comment0", "else", None
+    def state_eql_or_arw(self):
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_eql_or_arw"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char == "-":
-            return "state_single_comment1", "else", None
-
-        self.cur_pos -= 1
-        return "state_single_comment0", "else", None
+    def state_single_comment_or_sub(self):
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_single_comment_or_sub"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
     def state_single_comment1(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_single_comment1", "\n", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_single_comment1"
+        if cur_char is None:
+            return self_state, "\n", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        self.buffer += cur_char
-        if cur_char == "\n":
-            self.cur_pos -= 1
-            return "state_single_comment1", "\n", None
-
-        return "state_single_comment1", "else", None
-
-    def state_left_parenthesis(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_left_parenthesis", "else", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char == "*":
-            return "state_full_comment0", "else", None
-
-        self.cur_pos -= 1
-        return "state_left_parenthesis", "else", None
-
-    def state_full_comment0(self):
-        if self.cur_pos + 1 >= self.length:
-            return "start", "else", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        self.buffer += cur_char
-        if cur_char == "*":
-            return "state_full_comment1", "*", None
-
-        return "state_full_comment0", "else", None
+    def state_left_parenthesis_or_full_comment(self):
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_left_parenthesis_or_full_comment"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
     def state_full_comment1(self):
-        if self.cur_pos + 1 >= self.length:
-            return "start", "else", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_full_comment1"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char == ")":
-            return "state_full_comment1", ")", None
-
-        self.buffer += cur_char
-        if cur_char == "*":
-            return "state_full_comment1", "*", None
-
-        return "state_full_comment1", "else", None
+    def state_full_comment2(self):
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_full_comment2"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
     def state_less_eq_or_assign(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_less_eq", "else", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char == "=":
-            return "state_less_eq", "=", None
-        if cur_char == "-":
-            return "state_less_eq", "-", None
-
-        self.cur_pos -= 1
-        return "state_less_eq", "else", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_less_eq_or_assign"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
     def state_let0(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_let0", "var", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char == "e":
-            return "state_let0", "e", None
-
-        if cur_char in Lexer.var_characters or cur_char.isspace():
-            return "state_let0", "var", None
-
-        return "start", "else", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_let0"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
     def state_let1(self):
-        if self.cur_pos + 1 >= self.length:
-            return "start", "else", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char == "t":
-            return "state_let1", "t", None
-
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_let1", "var", None
-
-        return "start", "else", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_let1"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
     def state_let2(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_let2", "else", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_let2"
+        if cur_char is None:
+            return self_state, "\n", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char.isspace() or cur_char == "(":
-            return "state_let2", "else", None
-
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_let2", "var", None
-
-        return "start", "else", None
-    
     def state_and0(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_and0", "var", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char == "n":
-            return "state_and0", "n", None
-
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_and0", "var", None
-
-        return "start", "else", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_and0"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
     def state_and1(self):
-        if self.cur_pos + 1 >= self.length:
-            return "start", "else", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char == "d":
-            return "state_and1", "d", None
-
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_and1", "var", None
-
-        return "start", "else", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_and1"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
     def state_and2(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_and2", "else", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_and2"
+        if cur_char is None:
+            return self_state, "\n", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char.isspace() or cur_char == "(":
-            return "state_and2", "else", None
-
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_and2", "var", None
-
-        return "start", "else", None
-    
     def state_or0(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_or0", "var", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char == "r":
-            return "state_or0", "r", None
-
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_or0", "var", None
-
-        return "start", "else", None
-
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_or0"
+        if cur_char is None:
+            return self_state, "\n", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
     def state_or1(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_or1", "else", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_or1"
+        if cur_char is None:
+            return self_state, "\n", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char.isspace() or cur_char == "(":
-            return "state_or1", "else", None
-
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_or1", "var", None
-
-        return "start", "else", None
-
-    def state_end0(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_end0", "var", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char == "n" or cur_char == "l":
-            return "state_end0", cur_char, None
-
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_end0", "var", None
-
-        return "start", "else", None
+    def state_end_or_else(self):
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_end_or_else"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
     def state_end1(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_end1", "var", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char == "d":
-            return "state_end1", "d", None
-
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_end1", "var", None
-
-        return "start", "else", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_end1"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
     def state_end2(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_end2", "else", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char.isspace() or cur_char == "(":
-            return "state_end2", "else", None
-
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_end2", "var", None
-
-        return "start", "else", None
-
-    def state_else0(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_else0", "var", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char == "s":
-            return "state_else0", "s", None
-
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_else0", "var", None
-
-        return "start", "else", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_end2"
+        if cur_char is None:
+            return self_state, "\n", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
     def state_else1(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_else1", "var", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char == "e":
-            return "state_else1", "e", None
-
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_else1", "var", None
-
-        return "start", "else", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_else1"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
     def state_else2(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_else2", "else", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_else2"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char.isspace() or cur_char == "(":
-            return "state_else2", "else", None
+    def state_else3(self):
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_else3"
+        if cur_char is None:
+            return self_state, "\n", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_else2", "var", None
-
-        return "start", "else", None
-
-    def state_in0(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_in0", "var", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char == "n" or cur_char == "f":
-            return "state_in0", cur_char, None
-
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_in0", "var", None
-
-        return "start", "else", None
+    def state_in_or_if(self):
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_in_or_if"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
     def state_in1(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_in1", "else", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_in1"
+        if cur_char is None:
+            return self_state, "\n", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char.isspace() or cur_char == "(":
-            return "state_in1", "else", None
-
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_in1", "var", None
-
-        return "start", "else", None
-
-    def state_if0(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_if0", "else", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char.isspace() or cur_char == "(":
-            return "state_if0", "else", None
-
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_if0", "var", None
-
-        return "start", "else", None
+    def state_if1(self):
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_if1"
+        if cur_char is None:
+            return self_state, "\n", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
     def state_not0(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_not0", "else", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char == "o":
-            return "state_not0", "o", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_not0"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
         
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_not0", "var", None
-
-        return "start", "else", None
+        return self_state, "else", None
 
     def state_not1(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_not1", "var", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char == "t":
-            return "state_not1", "t", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_not1"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
         
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_not1", "var", None
-
-        return "start", "else", None
+        return self_state, "else", None
 
     def state_not2(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_not2", "else", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char.isspace() or cur_char == "(":
-            return "state_not2", "else", None
-
-        return "start", "else", None
-
-    def state_true0(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_true0", "var", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char == "r" or cur_char == "h":
-            return "state_true0", cur_char, None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_not2"
+        if cur_char is None:
+            return self_state, "\n", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
         
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_true0", "var", None
+        return self_state, "else", None
 
-        return "start", "else", None
+    def state_true_or_then(self):
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_true_or_then"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
     def state_true1(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_true1", "var", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char == "u":
-            return "state_true1", "u", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_true1"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
         
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_true1", "var", None
-
-        return "start", "else", None
+        return self_state, "else", None
 
     def state_true2(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_true2", "var", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char == "e":
-            return "state_true2", "e", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_true2"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
         
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_true2", "var", None
-
-        return "start", "else", None
+        return self_state, "else", None
 
     def state_true3(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_true3", "else", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char.isspace() or cur_char in "()":
-            self.cur_pos -= 1
-            return "state_true3", "else", None
-
-        return "start", "else", None
-
-    def state_then0(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_then0", "var", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char == "e":
-            return "state_then0", "e", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_true3"
+        if cur_char is None:
+            return self_state, "\n", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
         
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_then0", "var", None
-
-        return "start", "else", None
+        return self_state, "else", None
 
     def state_then1(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_then1", "var", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char == "n":
-            return "state_then1", "n", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_then1"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
         
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_then1", "var", None
-
-        return "start", "else", None
+        return self_state, "else", None
 
     def state_then2(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_then2", "else", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char.isspace() or cur_char in "()":
-            self.cur_pos -= 1
-            return "state_then2", "else", None
-
-        return "start", "else", None
-
-    def state_false0(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_false0", "var", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char == "a":
-            return "state_false0", "a", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_then2"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
         
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_false0", "var", None
+        return self_state, "else", None
 
-        return "start", "else", None
+    def state_then3(self):
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_then3"
+        if cur_char is None:
+            return self_state, "\n", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
+
+    def state_false_or_fn(self):
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_false_or_fn"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
     def state_false1(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_false1", "var", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char == "l":
-            return "state_false1", "l", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_false1"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
         
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_false1", "var", None
-
-        return "start", "else", None
+        return self_state, "else", None
 
     def state_false2(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_false2", "var", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char == "s":
-            return "state_false2", "s", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_false2"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
         
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_false2", "var", None
-
-        return "start", "else", None
+        return self_state, "else", None
 
     def state_false3(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_false3", "var", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char == "e":
-            return "state_false3", "e", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_false3"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
         
-        if cur_char in Lexer.var_characters  or cur_char.isspace():
-            return "state_false3", "var", None
-
-        return "start", "else", None
+        return self_state, "else", None
 
     def state_false4(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_false4", "else", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_false4"
+        if cur_char is None:
+            return self_state, "\n", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char.isspace() or cur_char in "()":
-            self.cur_pos -= 1
-            return "state_false4", "else", None
+    def state_fn1(self):
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_fn1"
+        if cur_char is None:
+            return self_state, "\n", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
-        return "start", "else", None
 
     def state_zero(self):
-        self.buffer = "0"
-        if self.cur_pos + 1 >= self.length:
-            return "state_zero", "else", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-
-        if cur_char in "01234567":
-            self.buffer += cur_char
-            return "state_zero", "0-7", None
-        elif cur_char in "xX":
-            self.buffer += cur_char
-            return "state_zero", "x|X", None
-        elif cur_char in "bB":
-            self.buffer += cur_char
-            return "state_zero", "b|B", None
-        elif cur_char.isalpha():
-            return "start", "else", None
-
-        self.cur_pos -= 1
-        return "state_zero", "else", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_zero"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
     def state_octal(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_octal", "else", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char in "01234567":
-            self.buffer += cur_char
-            return "state_octal", "0-7", None
-        if cur_char.isalpha():
-            return "start", "else", None
-
-        self.cur_pos -= 1
-        return "state_octal", "else", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_octal"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
     def state_hexadecimal(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_hexadecimal", "else", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char in "0123456789abcdefABCDEF":
-            self.buffer += cur_char
-            return "state_hexadecimal", "0-9|a-f|A-F", None
-        if cur_char.isalpha():
-            return "start", "else", None
-
-        self.cur_pos -= 1
-        return "state_hexadecimal", "else", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_hexadecimal"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
     def state_binary(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_binary", "else", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char in "01":
-            self.buffer += cur_char
-            return "state_binary", "0|1", None
-        if cur_char.isalpha():
-            return "start", "else", None
-
-        self.cur_pos -= 1
-        return "state_binary", "else", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_binary"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
     def state_integer(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_integer", "else", None
-
-        self.cur_pos += 1
-        cur_char = self.source[self.cur_pos]
-        if cur_char.isdigit():
-            self.buffer += cur_char
-            return "state_integer", "0-9", None
-        if cur_char.isalpha():
-            return "start", "else", None
-
-        self.cur_pos -= 1
-        return "state_integer", "else", None
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_integer"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+        
+        return self_state, "else", None
 
     def state_variable(self):
-        if self.cur_pos + 1 >= self.length:
-            return "state_variable", "else", None
-
-        cur_char = self.source[self.cur_pos]
-        self.cur_pos += 1
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_variable"
+        if cur_char is None:
+            return self_state, "else", None
         if cur_char in Lexer.var_characters:
-            self.buffer += cur_char
-            return "state_variable", "var_characters", None
-        if not (cur_char.isspace() or cur_char == ')'):
-            return "start", "else", None
+            return self_state, "continue", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
 
-        self.cur_pos -= 2
-        return "state_variable", "else", None
+        return self_state, "else", None
 
-    def dispatch(self, state, input_state=None):
-        if self.cur_pos >= self.length:
+    def dispatch(self, state, input_state):
+        if input_state is None and self.cur_pos >= self.length:
             return None, None, Token("", TokenType.EOF)
 
-        cur_char = self.source[self.cur_pos]
         if input_state is None:
-            if cur_char == "0":
-                action = self.state_table[state]["0"]
-            elif cur_char.isdigit():
-                self.buffer += cur_char
-                action = self.state_table[state]["digit_not_zero"]
-            elif cur_char in self.state_table[state]:
+            cur_char = self.getChar()
+            if cur_char in self.state_table[state]:
                 action = self.state_table[state][cur_char]
-            elif cur_char.isalpha():
-                action = self.state_table[state]["alpha"]
             else:
-                action = self.state_error
+                action = self.state_table[state]["else"]
         else:
             action = self.state_table[state][input_state]
 
@@ -1099,4 +1229,10 @@ class Lexer:
         while state:
             state, input_state, token = self.dispatch(state, input_state)
             if token:
+                self.buffer = ""
                 return token
+
+if __name__ == "__main__":
+    l = Lexer("~ if 2 < 3 then 1 else 0")
+    x = [tk.text for tk in l.tokens()]
+    print(x)
