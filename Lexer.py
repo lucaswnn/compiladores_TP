@@ -1231,8 +1231,3 @@ class Lexer:
             if token:
                 self.buffer = ""
                 return token
-
-if __name__ == "__main__":
-    l = Lexer("~ if 2 < 3 then 1 else 0")
-    x = [tk.text for tk in l.tokens()]
-    print(x)
