@@ -4,23 +4,29 @@ from Expression import *
 from Lexer import Token, TokenType
 
 """
-This file implements the parser of arithmetic expressions.
+This file implements a parser for SML with anonymous functions. The grammar is
+as follows:
 
-Precedence table:
-    1: not ~ ()
-    2: *   /
-    3: +   -
-    4: <   <=   >=   >
-    5: =
-    6: and
-    7: or
-    8: if-then-else
-
-Notice that not 2 < 3 must be a type error, as we are trying to apply a boolean
-operation (not) onto a number.
+fn_exp  ::= fn <var> => fn_exp
+          | if_exp
+if_exp  ::= <if> if_exp <then> fn_exp <else> fn_exp
+          | or_exp
+or_exp  ::= and_exp (or and_exp)*
+and_exp ::= eq_exp (and eq_exp)*
+eq_exp  ::= cmp_exp (= cmp_exp)*
+cmp_exp ::= add_exp ([<=|<] add_exp)*
+add_exp ::= mul_exp ([+|-] mul_exp)*
+mul_exp ::= unary_exp ([*|/] unary_exp)*
+unary_exp ::= <not> unary_exp
+             | ~ unary_exp
+             | let_exp
+let_exp ::= <let> <var> <- fn_exp <in> fn_exp <end>
+          | val_exp
+val_exp ::= val_tk (val_tk)*
+val_tk ::= <var> | ( fn_exp ) | <num> | <true> | <false>
 
 References:
-    see https://www.engr.mun.ca/~theo/Misc/exp_parsing.htm
+    see https://www.engr.mun.ca/~theo/Misc/exp_parsing.htm#classic
 """
 
 
@@ -249,112 +255,240 @@ class Parser:
         >>> ev = EvalVisitor()
         >>> exp.accept(ev, None)
         2
+
+        >>> tk0 = Token('fn', TokenType.FNX)
+        >>> tk1 = Token('v', TokenType.VAR)
+        >>> tk2 = Token('=>', TokenType.ARW)
+        >>> tk3 = Token('v', TokenType.VAR)
+        >>> tk4 = Token('+', TokenType.ADD)
+        >>> tk5 = Token('1', TokenType.NUM)
+        >>> parser = Parser([tk0, tk1, tk2, tk3, tk4, tk5])
+        >>> exp = parser.parse()
+        >>> ev = EvalVisitor()
+        >>> print(exp.accept(ev, None))
+        Fn(v)
+
+        >>> tk0 = Token('(', TokenType.LPR)
+        >>> tk1 = Token('fn', TokenType.FNX)
+        >>> tk2 = Token('v', TokenType.VAR)
+        >>> tk3 = Token('=>', TokenType.ARW)
+        >>> tk4 = Token('v', TokenType.VAR)
+        >>> tk5 = Token('+', TokenType.ADD)
+        >>> tk6 = Token('1', TokenType.NUM)
+        >>> tk7 = Token(')', TokenType.RPR)
+        >>> tk8 = Token('2', TokenType.NUM)
+        >>> parser = Parser([tk0, tk1, tk2, tk3, tk4, tk5, tk6, tk7, tk8])
+        >>> exp = parser.parse()
+        >>> ev = EvalVisitor()
+        >>> exp.accept(ev, {})
+        3
         """
 
-        return self.Exp()
+        return self.FN_EXP()
 
-    def Exp(self):
-        return self.ITE()
+    def FN_EXP(self):
+        token = self.current_token
+        if token.kind == TokenType.FNX:
+            self.consumeToken(TokenType.FNX)
+            token = self.current_token
+            if token.kind != TokenType.VAR:
+                sys.exit("Parse error")
+            self.consumeToken(TokenType.VAR)
+            var_name = token.text
+            token = self.current_token
+            if token.kind != TokenType.ARW:
+                sys.exit("Parse error")
+            self.consumeToken(TokenType.ARW)
+            body_exp = self.FN_EXP()
+            return Fn(var_name, body_exp)
+        else:
+            return self.IF_EXP()
 
-    def ITE(self):
+    def IF_EXP(self):
         token = self.current_token
         if token.kind == TokenType.IFX:
             self.consumeToken(TokenType.IFX)
-            if_exp = self.ITE()
+            if_exp = self.IF_EXP()
             token = self.current_token
             if token.kind != TokenType.THN:
                 sys.exit("Parse error")
             self.consumeToken(TokenType.THN)
-            then_exp = self.DIS()
+            then_exp = self.FN_EXP()
             token = self.current_token
             if token.kind != TokenType.ELS:
                 sys.exit("Parse error")
             self.consumeToken(TokenType.ELS)
-            else_exp = self.DIS()
+            else_exp = self.FN_EXP()
             return IfThenElse(if_exp, then_exp, else_exp)
+        else:
+            return self.OR_EXP()
 
-        return self.DIS()
-
-    def DIS(self):
-        exp = self.CON()
+    def OR_EXP(self):
+        exp = self.AND_EXP()
         return self.Disjunction(exp)
 
     def Disjunction(self, left):
         token = self.current_token
         if token.kind == TokenType.ORX:
             self.consumeToken(TokenType.ORX)
-            right = self.CON()
+            right = self.AND_EXP()
             return self.Disjunction(Or(left, right))
-        return left
+        else:
+            return left
 
-    def CON(self):
-        exp = self.B()
+    def AND_EXP(self):
+        exp = self.EQ_EXP()
         return self.Conjunction(exp)
 
     def Conjunction(self, left):
         token = self.current_token
         if token.kind == TokenType.AND:
             self.consumeToken(TokenType.AND)
-            right = self.B()
+            right = self.EQ_EXP()
             return self.Conjunction(And(left, right))
-        return left
+        else:
+            return left
 
-    def B(self):
-        exp = self.P()
-        return self.Bool(exp)
+    def EQ_EXP(self):
+        exp = self.CMP_EXP()
+        return self.Equal(exp)
 
-    def Bool(self, left):
+    def Equal(self, left):
         token = self.current_token
         if token.kind == TokenType.EQL:
             self.consumeToken(TokenType.EQL)
-            right = self.P()
-            return self.Bool(Eql(left, right))
+            right = self.CMP_EXP()
+            return self.Equal(Eql(left, right))
+        else:
+            return left
+
+    def CMP_EXP(self):
+        exp = self.ADD_EXP()
+        return self.Comparison(exp)
+
+    def Comparison(self, left):
+        token = self.current_token
+        if token.kind == TokenType.LTH:
+            self.consumeToken(TokenType.LTH)
+            right = self.ADD_EXP()
+            return self.Comparison(Lth(left, right))
         elif token.kind == TokenType.LEQ:
             self.consumeToken(TokenType.LEQ)
-            right = self.P()
-            return self.Bool(Leq(left, right))
-        elif token.kind == TokenType.LTH:
-            self.consumeToken(TokenType.LTH)
-            right = self.P()
-            return self.Bool(Lth(left, right))
+            right = self.ADD_EXP()
+            return self.Comparison(Leq(left, right))
+        else:
+            return left
 
-        return left
+    def ADD_EXP(self):
+        exp = self.MUL_EXP()
+        return self.SumSub(exp)
 
-    def P(self):
-        exp = self.M()
-        return self.Plus(exp)
-
-    def Plus(self, left):
+    def SumSub(self, left):
         token = self.current_token
         if token.kind == TokenType.ADD:
             self.consumeToken(TokenType.ADD)
-            right = self.M()
-            return self.Plus(Add(left, right))
+            right = self.MUL_EXP()
+            return self.SumSub(Add(left, right))
         elif token.kind == TokenType.SUB:
             self.consumeToken(TokenType.SUB)
-            right = self.M()
-            return self.Plus(Sub(left, right))
+            right = self.MUL_EXP()
+            return self.SumSub(Sub(left, right))
+        else:
+            return left
 
-        return left
+    def MUL_EXP(self):
+        exp = self.UNARY_EXP()
+        return self.MulDiv(exp)
 
-    def M(self):
-        exp = self.F()
-        return self.Mul(exp)
-
-    def Mul(self, left):
+    def MulDiv(self, left):
         token = self.current_token
         if token.kind == TokenType.MUL:
             self.consumeToken(TokenType.MUL)
-            right = self.F()
-            return self.Mul(Mul(left, right))
+            right = self.UNARY_EXP()
+            return self.MulDiv(Mul(left, right))
         elif token.kind == TokenType.DIV:
             self.consumeToken(TokenType.DIV)
-            right = self.F()
-            return self.Mul(Div(left, right))
+            right = self.UNARY_EXP()
+            return self.MulDiv(Div(left, right))
+        else:
+            return left
 
-        return left
+    def UNARY_EXP(self):
+        token = self.current_token
+        if token.kind == TokenType.NOT:
+            self.consumeToken(TokenType.NOT)
+            token = self.current_token
+            if (not
+                    (token.kind == TokenType.LPR
+                     or token.kind == TokenType.VAR
+                     or token.kind == TokenType.TRU
+                     or token.kind == TokenType.FLS
+                     or token.kind == TokenType.NUM
+                     or token.kind == TokenType.LET)
+                    ):
+                sys.exit("Parse error")
+            exp = self.UNARY_EXP()
 
-    def F(self):
+            return Not(exp)
+        elif token.kind == TokenType.NEG:
+            self.consumeToken(TokenType.NEG)
+            token = self.current_token
+            if (not
+                (token.kind == TokenType.LPR or
+                         token.kind == TokenType.VAR or
+                         token.kind == TokenType.NUM or
+                         token.kind == TokenType.LET)
+                ):
+                sys.exit("Parse error")
+            exp = self.UNARY_EXP()
+            return Neg(exp)
+        else:
+            return self.LET_EXP()
+
+    def LET_EXP(self):
+        token = self.current_token
+        if token.kind == TokenType.LET:
+            self.consumeToken(TokenType.LET)
+            token = self.current_token
+            if token.kind != TokenType.VAR:
+                sys.exit("Parse error")
+            self.consumeToken(TokenType.VAR)
+            name = token.text
+            token = self.current_token
+            if token.kind != TokenType.ASN:
+                sys.exit("Parse error")
+            self.consumeToken(TokenType.ASN)
+            e0 = self.FN_EXP()
+            token = self.current_token
+            if token.kind != TokenType.INX:
+                sys.exit("Parse error")
+            self.consumeToken(TokenType.INX)
+            e1 = self.FN_EXP()
+            token = self.current_token
+            if token.kind != TokenType.END:
+                sys.exit("Parse error")
+            self.consumeToken(TokenType.END)
+            return Let(name, e0, e1)
+        else:
+            return self.VAL_EXP()
+
+    def VAL_EXP(self):
+        exp = self.VAL_TK()
+        return self.Value(exp)
+
+    def Value(self, left):
+        token = self.current_token
+        if token.kind in {TokenType.VAR,
+                          TokenType.NUM,
+                          TokenType.TRU,
+                          TokenType.FLS,
+                          TokenType.LPR}:
+            right = self.VAL_TK()
+            return self.Value(App(left, right))
+        else:
+            return left
+
+    def VAL_TK(self):
         token = self.current_token
         if token.kind == TokenType.NUM:
             self.consumeToken(TokenType.NUM)
@@ -372,59 +506,11 @@ class Parser:
             self.consumeToken(TokenType.FLS)
             return Bln(False)
 
-        elif token.kind == TokenType.NEG:
-            self.consumeToken(TokenType.NEG)
-            token = self.current_token
-            if (not
-                (token.kind == TokenType.LPR or
-                         token.kind == TokenType.VAR or
-                         token.kind == TokenType.NUM or
-                         token.kind == TokenType.LET)
-                ):
-                sys.exit("Parse error")
-            node = self.F()
-            return Neg(node)
-
         elif token.kind == TokenType.LPR:  # '('
             self.consumeToken(TokenType.LPR)
-            node = self.Exp()
+            node = self.FN_EXP()
+            token = self.current_token
+            if token.kind != TokenType.RPR:
+                sys.exit("Parse error")
             self.consumeToken(TokenType.RPR)  # ')'
             return node
-
-        elif token.kind == TokenType.NOT:
-            self.consumeToken(TokenType.NOT)
-            token = self.current_token
-            if (not
-                    (token.kind == TokenType.LPR
-                     or token.kind == TokenType.VAR
-                     or token.kind == TokenType.TRU
-                     or token.kind == TokenType.FLS
-                     or token.kind == TokenType.NUM
-                     or token.kind == TokenType.LET)
-                    ):
-                sys.exit("Parse error")
-            node = self.F()
-            return Not(node)
-
-        elif token.kind == TokenType.LET:
-            self.consumeToken(TokenType.LET)
-            token = self.current_token
-            if token.kind != TokenType.VAR:
-                sys.exit("Parse error")
-            self.consumeToken(TokenType.VAR)
-            name = token.text
-            token = self.current_token
-            if token.kind != TokenType.ASN:
-                sys.exit("Parse error")
-            self.consumeToken(TokenType.ASN)
-            e0 = self.Exp()
-            token = self.current_token
-            if token.kind != TokenType.INX:
-                sys.exit("Parse error")
-            self.consumeToken(TokenType.INX)
-            e1 = self.Exp()
-            token = self.current_token
-            if token.kind != TokenType.END:
-                sys.exit("Parse error")
-            self.consumeToken(TokenType.END)
-            return Let(name, e0, e1)
