@@ -1,0 +1,52 @@
+FN_EXP ::= 'fn' var '=>' FN_EXP
+         | IF_EXP
+
+IF_EXP ::= 'if' IF_EXP 'then' FN_EXP 'else' FN_EXP
+         | OR_EXP
+
+OR_EXP ::= AND_EXP Disjunction
+
+Disjunction ::= 'or' AND_EXP Disjunction
+              | empty
+
+AND_EXP ::= EQ_EXP Conjunction
+
+Conjunction ::= 'and' EQ_EXP Conjunction
+              | empty
+
+EQ_EXP ::= CMP_EXP Equal
+
+Equal ::= '=' CMP_EXP Equal
+        | empty
+
+CMP_EXP ::= ADD_EXP Comparison
+
+Comparison ::= '<' ADD_EXP Comparison
+             | '<=' ADD_EXP Comparison
+             | empty
+
+ADD_EXP ::= MUL_EXP SumSub
+
+SumSub ::= '+' MUL_EXP SumSub
+         | '-' MUL_EXP SumSub
+         | empty
+
+MUL_EXP ::= UNARY_EXP MulDiv
+
+MulDiv ::= '*' UNARY_EXP MulDiv
+         | '/' UNARY_EXP MulDiv
+         | empty
+
+UNARY_EXP ::= 'not' UNARY_EXP
+            | '~' UNARY_EXP
+            | LET_EXP
+
+LET_EXP ::= 'let' var '<-' FN_EXP 'in' FN_EXP 'end'
+          | VAL_EXP
+
+VAL_EXP ::= VAL_TK Value
+
+Value ::= VAL_TK Value
+        | empty
+
+VAL_TK ::= var | '(' FN_EXP ')' | num | true | false
