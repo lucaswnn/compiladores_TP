@@ -16,14 +16,17 @@ and_exp ::= eq_exp (and eq_exp)*
 eq_exp  ::= cmp_exp (= cmp_exp)*
 cmp_exp ::= add_exp ([<=|<] add_exp)*
 add_exp ::= mul_exp ([+|-] mul_exp)*
-mul_exp ::= unary_exp ([*|/] unary_exp)*
-unary_exp ::= <not> unary_exp
-             | ~ unary_exp
-             | let_exp
-let_exp ::= <let> <var> <- fn_exp <in> fn_exp <end>
+mul_exp ::= uny_exp ([*|div|mod] uny_exp)*
+uny_exp ::= <not> uny_exp
+          | ~ uny_exp
+          | let_exp
+let_exp ::= <let> decl <in> fn_exp <end>
           | val_exp
 val_exp ::= val_tk (val_tk)*
-val_tk ::= <var> | ( fn_exp ) | <num> | <true> | <false>
+val_tk  ::= <var> | ( fn_exp ) | <num> | <true> | <false>
+
+decl    ::= val <var> = fn_exp
+          | fun <var> <var> = fn_exp
 
 References:
     see https://www.engr.mun.ca/~theo/Misc/exp_parsing.htm#classic
@@ -106,7 +109,7 @@ class Parser:
         -12
 
         >>> tk0 = Token('30', TokenType.NUM)
-        >>> tk1 = Token('/', TokenType.DIV)
+        >>> tk1 = Token('div', TokenType.DIV)
         >>> tk2 = Token('4', TokenType.NUM)
         >>> parser = Parser([tk0, tk1, tk2])
         >>> exp = parser.parse()
@@ -203,28 +206,30 @@ class Parser:
         False
 
         >>> tk0 = Token('let', TokenType.LET)
-        >>> tk1 = Token('v', TokenType.VAR)
-        >>> tk2 = Token('<-', TokenType.ASN)
-        >>> tk3 = Token('42', TokenType.NUM)
-        >>> tk4 = Token('in', TokenType.INX)
-        >>> tk5 = Token('v', TokenType.VAR)
-        >>> tk6 = Token('end', TokenType.END)
-        >>> parser = Parser([tk0, tk1, tk2, tk3, tk4, tk5, tk6])
+        >>> tk1 = Token('val', TokenType.VAL)
+        >>> tk2 = Token('v', TokenType.VAR)
+        >>> tk3 = Token('=', TokenType.EQL)
+        >>> tk4 = Token('42', TokenType.NUM)
+        >>> tk5 = Token('in', TokenType.INX)
+        >>> tk6 = Token('v', TokenType.VAR)
+        >>> tk7 = Token('end', TokenType.END)
+        >>> parser = Parser([tk0, tk1, tk2, tk3, tk4, tk5, tk6, tk7])
         >>> exp = parser.parse()
         >>> ev = EvalVisitor()
         >>> exp.accept(ev, {})
         42
 
         >>> tk0 = Token('let', TokenType.LET)
-        >>> tk1 = Token('v', TokenType.VAR)
-        >>> tk2 = Token('<-', TokenType.ASN)
-        >>> tk3 = Token('21', TokenType.NUM)
-        >>> tk4 = Token('in', TokenType.INX)
-        >>> tk5 = Token('v', TokenType.VAR)
-        >>> tk6 = Token('+', TokenType.ADD)
-        >>> tk7 = Token('v', TokenType.VAR)
-        >>> tk8 = Token('end', TokenType.END)
-        >>> parser = Parser([tk0, tk1, tk2, tk3, tk4, tk5, tk6, tk7, tk8])
+        >>> tk1 = Token('val', TokenType.VAL)
+        >>> tk2 = Token('v', TokenType.VAR)
+        >>> tk3 = Token('=', TokenType.EQL)
+        >>> tk4 = Token('21', TokenType.NUM)
+        >>> tk5 = Token('in', TokenType.INX)
+        >>> tk6 = Token('v', TokenType.VAR)
+        >>> tk7 = Token('+', TokenType.ADD)
+        >>> tk8 = Token('v', TokenType.VAR)
+        >>> tk9 = Token('end', TokenType.END)
+        >>> parser = Parser([tk0, tk1, tk2, tk3, tk4, tk5, tk6, tk7, tk8, tk9])
         >>> exp = parser.parse()
         >>> ev = EvalVisitor()
         >>> exp.accept(ev, {})
@@ -282,6 +287,24 @@ class Parser:
         >>> ev = EvalVisitor()
         >>> exp.accept(ev, {})
         3
+
+        >>> t0 = Token('let', TokenType.LET)
+        >>> t1 = Token('fun', TokenType.FUN)
+        >>> t2 = Token('f', TokenType.VAR)
+        >>> t3 = Token('v', TokenType.VAR)
+        >>> t4 = Token('=', TokenType.EQL)
+        >>> t5 = Token('v', TokenType.VAR)
+        >>> t6 = Token('+', TokenType.ADD)
+        >>> t7 = Token('v', TokenType.VAR)
+        >>> t8 = Token('in', TokenType.INX)
+        >>> t9 = Token('f', TokenType.VAR)
+        >>> tA = Token('2', TokenType.NUM)
+        >>> tB = Token('end', TokenType.END)
+        >>> parser = Parser([t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, tA, tB])
+        >>> exp = parser.parse()
+        >>> ev = EvalVisitor()
+        >>> exp.accept(ev, {})
+        4
         """
 
         return self.FN_EXP()
@@ -410,6 +433,10 @@ class Parser:
             self.consumeToken(TokenType.DIV)
             right = self.UNARY_EXP()
             return self.MulDiv(Div(left, right))
+        elif token.kind == TokenType.MOD:
+            self.consumeToken(TokenType.MOD)
+            right = self.UNARY_EXP()
+            return self.MulDiv(Mod(left, right))
         else:
             return left
 
@@ -449,16 +476,7 @@ class Parser:
         token = self.current_token
         if token.kind == TokenType.LET:
             self.consumeToken(TokenType.LET)
-            token = self.current_token
-            if token.kind != TokenType.VAR:
-                sys.exit("Parse error")
-            self.consumeToken(TokenType.VAR)
-            name = token.text
-            token = self.current_token
-            if token.kind != TokenType.ASN:
-                sys.exit("Parse error")
-            self.consumeToken(TokenType.ASN)
-            e0 = self.FN_EXP()
+            declaration = self.DECL()
             token = self.current_token
             if token.kind != TokenType.INX:
                 sys.exit("Parse error")
@@ -468,7 +486,7 @@ class Parser:
             if token.kind != TokenType.END:
                 sys.exit("Parse error")
             self.consumeToken(TokenType.END)
-            return Let(name, e0, e1)
+            return Let(declaration.name, declaration.value, e1)
         else:
             return self.VAL_EXP()
 
@@ -514,3 +532,44 @@ class Parser:
                 sys.exit("Parse error")
             self.consumeToken(TokenType.RPR)  # ')'
             return node
+
+    def DECL(self):
+        token = self.current_token
+        if token.kind == TokenType.VAL:
+            self.consumeToken(TokenType.VAL)
+            token = self.current_token
+            if token.kind != TokenType.VAR:
+                sys.exit("Parse error")
+            name = token.text
+            self.consumeToken(TokenType.VAR)
+            token = self.current_token
+            if token.kind != TokenType.EQL:
+                sys.exit("Parse error")
+            self.consumeToken(TokenType.EQL)
+            value = self.FN_EXP()
+            return Declaration(name, value)
+        elif token.kind == TokenType.FUN:
+            self.consumeToken(TokenType.FUN)
+            token = self.current_token
+            if token.kind != TokenType.VAR:
+                sys.exit("Parse error")
+            name = token.text
+            self.consumeToken(TokenType.VAR)
+            token = self.current_token
+            if token.kind != TokenType.VAR:
+                sys.exit("Parse error")
+            formal = token.text
+            self.consumeToken(TokenType.VAR)
+            token = self.current_token
+            if token.kind != TokenType.EQL:
+                sys.exit("Parse error")
+            self.consumeToken(TokenType.EQL)
+            body = self.FN_EXP()
+            return Declaration(name, Fun(name, formal, body))
+        else:
+            sys.exit("Parse error")
+
+class Declaration:
+    def __init__(self, name, value):
+        self.name = name
+        self.value = value
