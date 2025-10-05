@@ -34,14 +34,15 @@ SumSub ::= '+' MUL_EXP SumSub
 MUL_EXP ::= UNARY_EXP MulDiv
 
 MulDiv ::= '*' UNARY_EXP MulDiv
-         | '/' UNARY_EXP MulDiv
+         | 'div' UNARY_EXP MulDiv
+         | 'mod' UNARY_EXP MulDiv
          | empty
 
 UNARY_EXP ::= 'not' UNARY_EXP
             | '~' UNARY_EXP
             | LET_EXP
 
-LET_EXP ::= 'let' var '<-' FN_EXP 'in' FN_EXP 'end'
+LET_EXP ::= 'let' DECL 'in' FN_EXP 'end'
           | VAL_EXP
 
 VAL_EXP ::= VAL_TK Value
@@ -50,3 +51,6 @@ Value ::= VAL_TK Value
         | empty
 
 VAL_TK ::= var | '(' FN_EXP ')' | num | true | false
+
+DECL ::= 'val' var '=' FN_EXP
+       | 'fun' var var '=' FN_EXP

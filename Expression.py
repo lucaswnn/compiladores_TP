@@ -1,6 +1,27 @@
 from abc import ABC, abstractmethod
 from Visitor import *
 
+"""
+This file adds recursive functions to our language. You can follow the
+semantics of these functions using the rules below, which were written in
+Prolog:
+
+eval(fn(Formal, Body), Env, fval(Formal, Body, Env)).
+
+eval(fun(Name, Formal, Body), Env, rfun(Name, Formal, Body, Env)).
+
+eval(apply(Function, Actual), Env, Value) :-
+  eval(Function, Env, fval(Formal, Body, Nesting)),
+  eval(Actual, Env, PValue),
+  eval(Body, [(Formal, PValue)|Nesting], Value).
+
+eval(applyrec(Function, Actual), Env, Value) :-
+  eval(Function, Env, rfun(Name, Formal, Body, Nesting)),
+  eval(Actual, Env, PValue),
+  NEnv = [(Name, rfun(Name, Formal, Body, Nesting)), (Formal, PValue)|Nesting]
+  eval(Body, NEnv, Value).
+"""
+
 
 class Expression(ABC):
     @abstractmethod
@@ -36,7 +57,7 @@ class Var(Expression):
 class Bln(Expression):
     """
     This class represents expressions that are boolean values. There are only
-    two boolean values: true and false. The acceptuation of such an expression is
+    two boolean values: true and false. The effect of such an expression is
     the boolean itself.
     """
 
@@ -56,7 +77,7 @@ class Bln(Expression):
 
 class Num(Expression):
     """
-    This class represents expressions that are numbers. The acceptuation of such
+    This class represents expressions that are numbers. The effect of such
     an expression is the number itself.
     """
 
@@ -91,7 +112,7 @@ class BinaryExpression(Expression):
 
 class Eql(BinaryExpression):
     """
-    This class represents the equality between two expressions. The acceptuation
+    This class represents the equality between two expressions. The effect
     of such an expression is True if the subexpressions are the same, or false
     otherwise.
     """
@@ -118,7 +139,7 @@ class Eql(BinaryExpression):
 
 class Add(BinaryExpression):
     """
-    This class represents addition of two expressions. The acceptuation of such
+    This class represents addition of two expressions. The effect of such
     an expression is the addition of the two subexpression's values.
     """
 
@@ -191,7 +212,7 @@ class Or(BinaryExpression):
 
 class Sub(BinaryExpression):
     """
-    This class represents subtraction of two expressions. The acceptuation of such
+    This class represents subtraction of two expressions. The effect of such
     an expression is the subtraction of the two subexpression's values.
     """
 
@@ -210,7 +231,7 @@ class Sub(BinaryExpression):
 
 class Mul(BinaryExpression):
     """
-    This class represents multiplication of two expressions. The acceptuation of
+    This class represents multiplication of two expressions. The effect of
     such an expression is the product of the two subexpression's values.
     """
 
@@ -230,7 +251,7 @@ class Mul(BinaryExpression):
 class Div(BinaryExpression):
     """
     This class represents the integer division of two expressions. The
-    acceptuation of such an expression is the integer quocient of the two
+    effect of such an expression is the integer quocient of the two
     subexpression's values.
     """
 
@@ -243,6 +264,7 @@ class Div(BinaryExpression):
         >>> ev = EvalVisitor()
         >>> e.accept(ev, None)
         7
+
         >>> n1 = Num(22)
         >>> n2 = Num(4)
         >>> e = Div(n1, n2)
@@ -253,10 +275,37 @@ class Div(BinaryExpression):
         return visitor.visit_div(self, arg)
 
 
+class Mod(BinaryExpression):
+    """
+    This class represents the integer modulo of two expressions. The
+    effect of such an expression is the integer quocient of the two
+    subexpression's values.
+    """
+
+    def accept(self, visitor, arg):
+        """
+        Example:
+        >>> n1 = Num(28)
+        >>> n2 = Num(4)
+        >>> e = Mod(n1, n2)
+        >>> ev = EvalVisitor()
+        >>> e.accept(ev, None)
+        0
+
+        >>> n1 = Num(22)
+        >>> n2 = Num(4)
+        >>> e = Mod(n1, n2)
+        >>> ev = EvalVisitor()
+        >>> e.accept(ev, None)
+        2
+        """
+        return visitor.visit_mod(self, arg)
+
+
 class Leq(BinaryExpression):
     """
     This class represents comparison of two expressions using the
-    less-than-or-equal comparator. The acceptuation of such an expression is a
+    less-than-or-equal comparator. The effect of such an expression is a
     boolean value that is true if the left operand is less than or equal the
     right operand. It is false otherwise.
     """
@@ -270,12 +319,14 @@ class Leq(BinaryExpression):
         >>> ev = EvalVisitor()
         >>> e.accept(ev, None)
         True
+
         >>> n1 = Num(3)
         >>> n2 = Num(3)
         >>> e = Leq(n1, n2)
         >>> ev = EvalVisitor()
         >>> e.accept(ev, None)
         True
+
         >>> n1 = Num(4)
         >>> n2 = Num(3)
         >>> e = Leq(n1, n2)
@@ -289,7 +340,7 @@ class Leq(BinaryExpression):
 class Lth(BinaryExpression):
     """
     This class represents comparison of two expressions using the
-    less-than comparison operator. The acceptuation of such an expression is a
+    less-than comparison operator. The effect of such an expression is a
     boolean value that is true if the left operand is less than the right
     operand. It is false otherwise.
     """
@@ -303,12 +354,14 @@ class Lth(BinaryExpression):
         >>> ev = EvalVisitor()
         >>> e.accept(ev, None)
         True
+
         >>> n1 = Num(3)
         >>> n2 = Num(3)
         >>> e = Lth(n1, n2)
         >>> ev = EvalVisitor()
         >>> e.accept(ev, None)
         False
+
         >>> n1 = Num(4)
         >>> n2 = Num(3)
         >>> e = Lth(n1, n2)
@@ -347,6 +400,7 @@ class Neg(UnaryExpression):
         >>> ev = EvalVisitor()
         >>> e.accept(ev, None)
         -3
+
         >>> n = Num(0)
         >>> e = Neg(n)
         >>> ev = EvalVisitor()
@@ -370,6 +424,7 @@ class Not(UnaryExpression):
         >>> ev = EvalVisitor()
         >>> e.accept(ev, None)
         False
+
         >>> t = Bln(False)
         >>> e = Not(t)
         >>> ev = EvalVisitor()
@@ -377,7 +432,6 @@ class Not(UnaryExpression):
         True
         """
         return visitor.visit_not(self, arg)
-
 
 class Let(Expression):
     """
@@ -431,6 +485,26 @@ class Fn(Expression):
         return visitor.visit_fn(self, arg)
 
 
+class Fun(Expression):
+    """
+    This class represents a named function. Named functions can be invoked
+    recursively.
+
+        >>> f = Fun('f', 'v', Mul(Var('v'), Var('v')))
+        >>> ev = EvalVisitor()
+        >>> print(f.accept(ev, {}))
+        Fun f(v)
+    """
+
+    def __init__(self, name, formal, body):
+        self.name = name
+        self.formal = formal
+        self.body = body
+
+    def accept(self, visitor, arg):
+        return visitor.visit_fun(self, arg)
+
+
 class App(Expression):
     """
     This class represents a function application, such as 'e0 e1'. The semantics
@@ -463,6 +537,13 @@ class App(Expression):
         >>> ev = EvalVisitor()
         >>> e2.accept(ev, {})
         3
+
+        >>> e0 = Fun('f', 'v', Mul(Var('v'), Var('v')))
+        >>> e1 = Add(Num(3), Num(4))
+        >>> e2 = App(e0, e1)
+        >>> ev = EvalVisitor()
+        >>> print(e2.accept(ev, {}))
+        49
     """
 
     def __init__(self, function, actual):
