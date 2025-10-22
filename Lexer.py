@@ -47,7 +47,7 @@ class TokenType(enum.Enum):
     NOT = 209  # not x
     LPR = 210  # (
     RPR = 211  # )
-    VAL = 212  # The 'val' declaration
+    ASN = 212  # The assignment '<-' operator
     ORX = 213  # x or y
     AND = 214  # x and y
     IFX = 215  # The 'if' of a conditional expression
@@ -55,8 +55,10 @@ class TokenType(enum.Enum):
     ELS = 217  # The 'else' of a conditional expression
     FNX = 218  # The 'fn' that declares an anonymous function
     ARW = 219  # The '=>' that separates the parameter from the body of function
-    FUN = 220  # The 'fun' declaration
-    MOD = 221  # The 'mod' operator
+    TPF = 220  # The arrow that indicates a function type
+    COL = 221  # The colon that separates type annotations
+    INT = 222  # The int type ('int')
+    LGC = 223  # The boolean (logic) type ('bool')
 
 
 class Lexer:
@@ -101,7 +103,8 @@ class Lexer:
                 "/": self.state_DIV,
                 "~": self.state_NEG,
                 ")": self.state_RPR,
-                "-": self.state_single_comment_or_sub,
+                ":": self.state_COL,
+                "-": self.state_single_comment_or_sub_or_type,
                 "(": self.state_left_parenthesis_or_full_comment,
                 "<": self.state_less_eq_or_assign,
                 "n": self.state_not0,
@@ -114,7 +117,8 @@ class Lexer:
                 "e": self.state_end_or_else,
                 "o": self.state_or0,
                 "a": self.state_and0,
-                "i": self.state_in_or_if,
+                "b": self.state_bool0,
+                "i": self.state_in_or_if_or_int,
                 "0": self.state_zero,
                 "1": self.state_integer,
                 "2": self.state_integer,
@@ -186,7 +190,45 @@ class Lexer:
                 "\r": self.state_AND,
                 "else": self.state_variable,
             },
-
+            "state_bool0": {
+                "o": self.state_bool1,
+                "(": self.state_VAR,
+                ")": self.state_VAR,
+                " ": self.state_VAR,
+                "\n": self.state_VAR,
+                "\t": self.state_VAR,
+                "\r": self.state_VAR,
+                "else": self.state_variable,
+            },
+            "state_bool1": {
+                "o": self.state_bool2,
+                "(": self.state_VAR,
+                ")": self.state_VAR,
+                " ": self.state_VAR,
+                "\n": self.state_VAR,
+                "\t": self.state_VAR,
+                "\r": self.state_VAR,
+                "else": self.state_variable,
+            },
+            "state_bool2": {
+                "l": self.state_bool3,
+                "(": self.state_VAR,
+                ")": self.state_VAR,
+                " ": self.state_VAR,
+                "\n": self.state_VAR,
+                "\t": self.state_VAR,
+                "\r": self.state_VAR,
+                "else": self.state_variable,
+            },
+            "state_bool3": {
+                "-": self.state_LGC,
+                "(": self.state_LGC,
+                " ": self.state_LGC,
+                "\n": self.state_LGC,
+                "\t": self.state_LGC,
+                "\r": self.state_LGC,
+                "else": self.state_variable,
+            },
             "state_val0": {
                 "a": self.state_val1,
                 "(": self.state_VAR,
@@ -236,11 +278,11 @@ class Lexer:
                 "else": self.state_variable,
             },
             "state_div2": {
-                "(": self.state_DIV,
-                " ": self.state_DIV,
-                "\n": self.state_DIV,
-                "\t": self.state_DIV,
-                "\r": self.state_DIV,
+                "(": self.state_DIVTK,
+                " ": self.state_DIVTK,
+                "\n": self.state_DIVTK,
+                "\t": self.state_DIVTK,
+                "\r": self.state_DIVTK,
                 "else": self.state_variable,
             },
             "state_mod0": {
@@ -347,8 +389,8 @@ class Lexer:
                 "\r": self.state_ELS,
                 "else": self.state_variable,
             },
-            "state_in_or_if": {
-                "n": self.state_in1,
+            "state_in_or_if_or_int": {
+                "n": self.state_in_or_int,
                 "f": self.state_if1,
                 "(": self.state_VAR,
                 ")": self.state_VAR,
@@ -358,12 +400,23 @@ class Lexer:
                 "\r": self.state_VAR,
                 "else": self.state_variable,
             },
-            "state_in1": {
+            "state_in_or_int": {
+                "t": self.state_int1,
                 "(": self.state_INX,
                 " ": self.state_INX,
                 "\n": self.state_INX,
                 "\t": self.state_INX,
                 "\r": self.state_INX,
+                "else": self.state_variable,
+            },
+            "state_int1": {
+                "-": self.state_INTTYPE,
+                "(": self.state_INTTYPE,
+                ")": self.state_INTTYPE,
+                " ": self.state_INTTYPE,
+                "\n": self.state_INTTYPE,
+                "\t": self.state_INTTYPE,
+                "\r": self.state_INTTYPE,
                 "else": self.state_variable,
             },
             "state_if1": {
@@ -374,8 +427,9 @@ class Lexer:
                 "\r": self.state_IFX,
                 "else": self.state_variable,
             },
-            "state_single_comment_or_sub": {
+            "state_single_comment_or_sub_or_type": {
                 "-": self.state_single_comment1,
+                ">": self.state_TPF,
                 "else": self.state_SUB,
             },
             "state_single_comment1": {
@@ -699,6 +753,10 @@ class Lexer:
         self.consumeChar()
         return "start", None, Token(")", TokenType.RPR)
 
+    def state_COL(self):
+        self.consumeChar()
+        return "start", None, Token(":", TokenType.COL)
+
     def state_single_COM(self):
         comment = f"--{self.buffer}"
         return "start", None, Token(comment, TokenType.COM)
@@ -724,11 +782,14 @@ class Lexer:
     def state_MOD(self):
         return "start", None, Token("mod", TokenType.MOD)
 
-    def state_DIV(self):
+    def state_DIVTK(self):
         return "start", None, Token("div", TokenType.DIV)
 
     def state_AND(self):
         return "start", None, Token("and", TokenType.AND)
+
+    def state_LGC(self):
+        return "start", None, Token("bool", TokenType.LGC)
 
     def state_ORX(self):
         return "start", None, Token("or", TokenType.ORX)
@@ -741,6 +802,9 @@ class Lexer:
 
     def state_INX(self):
         return "start", None, Token("in", TokenType.INX)
+
+    def state_INTTYPE(self):
+        return "start", None, Token("int", TokenType.INT)
 
     def state_IFX(self):
         return "start", None, Token("if", TokenType.IFX)
@@ -784,6 +848,10 @@ class Lexer:
         self.consumeChar()
         return "start", None, Token("<-", TokenType.ASN)
 
+    def state_TPF(self):
+        self.consumeChar()
+        return "start", None, Token("->", TokenType.TPF)
+
     def state_eql_or_arw(self):
         self.consumeChar()
         cur_char = self.getChar()
@@ -795,10 +863,10 @@ class Lexer:
 
         return self_state, "else", None
 
-    def state_single_comment_or_sub(self):
+    def state_single_comment_or_sub_or_type(self):
         self.consumeChar()
         cur_char = self.getChar()
-        self_state = "state_single_comment_or_sub"
+        self_state = "state_single_comment_or_sub_or_type"
         if cur_char is None:
             return self_state, "else", None
         if cur_char in self.state_table[self_state]:
@@ -920,6 +988,50 @@ class Lexer:
         self.consumeChar()
         cur_char = self.getChar()
         self_state = "state_and2"
+        if cur_char is None:
+            return self_state, "\n", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+
+        return self_state, "else", None
+
+    def state_bool0(self):
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_bool0"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+
+        return self_state, "else", None
+
+    def state_bool1(self):
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_bool1"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+
+        return self_state, "else", None
+
+    def state_bool2(self):
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_bool2"
+        if cur_char is None:
+            return self_state, "else", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+
+        return self_state, "else", None
+
+    def state_bool3(self):
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_bool3"
         if cur_char is None:
             return self_state, "\n", None
         if cur_char in self.state_table[self_state]:
@@ -1114,10 +1226,10 @@ class Lexer:
 
         return self_state, "else", None
 
-    def state_in_or_if(self):
+    def state_in_or_if_or_int(self):
         self.consumeChar()
         cur_char = self.getChar()
-        self_state = "state_in_or_if"
+        self_state = "state_in_or_if_or_int"
         if cur_char is None:
             return self_state, "else", None
         if cur_char in self.state_table[self_state]:
@@ -1125,10 +1237,21 @@ class Lexer:
 
         return self_state, "else", None
 
-    def state_in1(self):
+    def state_in_or_int(self):
         self.consumeChar()
         cur_char = self.getChar()
-        self_state = "state_in1"
+        self_state = "state_in_or_int"
+        if cur_char is None:
+            return self_state, "\n", None
+        if cur_char in self.state_table[self_state]:
+            return self_state, cur_char, None
+
+        return self_state, "else", None
+
+    def state_int1(self):
+        self.consumeChar()
+        cur_char = self.getChar()
+        self_state = "state_int1"
         if cur_char is None:
             return self_state, "\n", None
         if cur_char in self.state_table[self_state]:
@@ -1405,7 +1528,7 @@ class Lexer:
         cur_char = self.getChar()
         if cur_char not in Lexer.var_characters:
             return self_state, "else", None
-        
+
         self.consumeChar()
         cur_char = self.getChar()
         if cur_char is None:
@@ -1460,17 +1583,17 @@ class Lexer:
         >>> [tk.kind for tk in l.tokens()]
         [<TokenType.NUM: 3>, <TokenType.ADD: 202>, <TokenType.VAR: 7>]
 
-        >>> l = Lexer("let val v = 2 in v end")
+        >>> l = Lexer("let v <- 2 in v end")
         >>> [tk.kind.name for tk in l.tokens()]
-        ['LET', 'VAL', 'VAR', 'EQL', 'NUM', 'INX', 'VAR', 'END']
+        ['LET', 'VAR', 'ASN', 'NUM', 'INX', 'VAR', 'END']
 
-        >>> l = Lexer("fn x => x + 1")
+        >>> l = Lexer("v: int -> int")
         >>> [tk.kind.name for tk in l.tokens()]
-        ['FNX', 'VAR', 'ARW', 'VAR', 'ADD', 'NUM']
+        ['VAR', 'COL', 'INT', 'TPF', 'INT']
 
-        >>> l = Lexer("fun inc a = a + 1")
+        >>> l = Lexer("v: int -> bool")
         >>> [tk.kind.name for tk in l.tokens()]
-        ['FUN', 'VAR', 'VAR', 'EQL', 'VAR', 'ADD', 'NUM']
+        ['VAR', 'COL', 'INT', 'TPF', 'LGC']
         """
         token = self.getToken()
         while token.kind != TokenType.EOF:
