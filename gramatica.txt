@@ -1,4 +1,4 @@
-FN_EXP ::= 'fn' var '=>' FN_EXP
+FN_EXP ::= 'fn' var':' TYPES '=>' FN_EXP
          | IF_EXP
 
 IF_EXP ::= 'if' IF_EXP 'then' FN_EXP 'else' FN_EXP
@@ -42,7 +42,7 @@ UNARY_EXP ::= 'not' UNARY_EXP
             | '~' UNARY_EXP
             | LET_EXP
 
-LET_EXP ::= 'let' DECL 'in' FN_EXP 'end'
+LET_EXP ::= 'let' var ':' TYPES '<-' FN_EXP 'in' FN_EXP 'end'
           | VAL_EXP
 
 VAL_EXP ::= VAL_TK Value
@@ -52,5 +52,7 @@ Value ::= VAL_TK Value
 
 VAL_TK ::= var | '(' FN_EXP ')' | num | true | false
 
-DECL ::= 'val' var '=' FN_EXP
-       | 'fun' var var '=' FN_EXP
+TYPES ::= TYPE '->' TYPES
+       | TYPE
+
+TYPE ::= int | bool | '(' TYPES ')'

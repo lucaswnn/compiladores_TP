@@ -9,18 +9,9 @@ if __name__ == "__main__":
     Este arquivo nao deve ser alterado, mas deve ser enviado para resolver o
     VPL. O arquivo contem o codigo que testa a implementacao do parser.
     """
-    #text = sys.stdin.read()
-    text = """
-    let
-        fun sumSq n = if n = 0 then 0 else n * n + sumSq (n-1)
-    in
-        sumSq 4
-    end
-    """
+    text = sys.stdin.read()
     lexer = Lexer(text)
-    tokens = list(lexer.tokens())
-    print(tokens)
     parser = Parser(lexer.tokens())
     exp = parser.parse()
-    visitor = EvalVisitor()
+    visitor = TypeCheckVisitor()
     print(f"{exp.accept(visitor, {})}")
