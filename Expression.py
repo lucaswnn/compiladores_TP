@@ -1,3 +1,8 @@
+"""
+This file implements the data structures that represent Expressions. You don't
+need to modify it for this assignment.
+"""
+
 from abc import ABC, abstractmethod
 from Visitor import *
 
@@ -18,26 +23,32 @@ class Var(Expression):
         self.identifier = identifier
 
     def accept(self, visitor, arg):
+        """
+        Variables don't need to be implemented for this exercise.
+        """
         return visitor.visit_var(self, arg)
 
 
 class Bln(Expression):
     """
     This class represents expressions that are boolean values. There are only
-    two boolean values: true and false. The semantics of such an expression is
-    the boolean itself.
+    two boolean values: true and false. The acceptuation of such an expression
+    is the boolean itself.
     """
 
     def __init__(self, bln):
         self.bln = bln
 
     def accept(self, visitor, arg):
+        """
+        booleans don't need to be implemented for this exercise.
+        """
         return visitor.visit_bln(self, arg)
 
 
 class Num(Expression):
     """
-    This class represents expressions that are numbers. The semantics of such
+    This class represents expressions that are numbers. The acceptuation of such
     an expression is the number itself.
     """
 
@@ -45,6 +56,13 @@ class Num(Expression):
         self.num = num
 
     def accept(self, visitor, arg):
+        """
+        Example:
+        >>> e = Num(3)
+        >>> ev = EvalVisitor()
+        >>> e.accept(ev, None)
+        3
+        """
         return visitor.visit_num(self, arg)
 
 
@@ -65,99 +83,128 @@ class BinaryExpression(Expression):
 
 class Eql(BinaryExpression):
     """
-    This class represents the equality between two expressions. The semantics
+    This class represents the equality between two expressions. The acceptuation
     of such an expression is True if the subexpressions are the same, or false
     otherwise.
     """
 
     def accept(self, visitor, arg):
+        """
+        Equality doesn't need to be implemented for this exercise.
+        """
         return visitor.visit_eql(self, arg)
 
 
 class Add(BinaryExpression):
     """
-    This class represents addition of two expressions. The semantics of such
+    This class represents addition of two expressions. The acceptuation of such
     an expression is the addition of the two subexpression's values.
     """
 
     def accept(self, visitor, arg):
+        """
+        Example:
+        >>> n1 = Num(3)
+        >>> n2 = Num(4)
+        >>> e = Add(n1, n2)
+        >>> ev = EvalVisitor()
+        >>> e.accept(ev, None)
+        7
+        """
         return visitor.visit_add(self, arg)
-
-
-class And(BinaryExpression):
-    """
-    This class represents the logical disjunction of two boolean expressions.
-    The evaluation of an expression of this kind is the logical AND of the two
-    subexpression's values.
-    """
-
-    def accept(self, visitor, arg):
-        return visitor.visit_and(self, arg)
-
-
-class Or(BinaryExpression):
-    """
-    This class represents the logical conjunction of two boolean expressions.
-    The evaluation of an expression of this kind is the logical OR of the two
-    subexpression's values.
-    """
-
-    def accept(self, visitor, arg):
-        return visitor.visit_or(self, arg)
 
 
 class Sub(BinaryExpression):
     """
-    This class represents subtraction of two expressions. The semantics of such
-    an expression is the subtraction of the two subexpression's values.
+    This class represents subtraction of two expressions. The acceptuation of
+    such an expression is the subtraction of the two subexpression's values.
     """
 
     def accept(self, visitor, arg):
+        """
+        Example:
+        >>> n1 = Num(3)
+        >>> n2 = Num(4)
+        >>> e = Sub(n1, n2)
+        >>> ev = EvalVisitor()
+        >>> e.accept(ev, None)
+        -1
+        """
         return visitor.visit_sub(self, arg)
 
 
 class Mul(BinaryExpression):
     """
-    This class represents multiplication of two expressions. The semantics of
+    This class represents multiplication of two expressions. The acceptuation of
     such an expression is the product of the two subexpression's values.
     """
 
     def accept(self, visitor, arg):
+        """
+        Example:
+        >>> n1 = Num(3)
+        >>> n2 = Num(4)
+        >>> e = Mul(n1, n2)
+        >>> ev = EvalVisitor()
+        >>> e.accept(ev, None)
+        12
+        """
         return visitor.visit_mul(self, arg)
 
 
 class Div(BinaryExpression):
     """
     This class represents the integer division of two expressions. The
-    semantics of such an expression is the integer quocient of the two
+    acceptuation of such an expression is the integer quocient of the two
     subexpression's values.
     """
 
     def accept(self, visitor, arg):
+        """
+        Example:
+        >>> n1 = Num(28)
+        >>> n2 = Num(4)
+        >>> e = Div(n1, n2)
+        >>> ev = EvalVisitor()
+        >>> e.accept(ev, None)
+        7
+        >>> n1 = Num(22)
+        >>> n2 = Num(4)
+        >>> e = Div(n1, n2)
+        >>> ev = EvalVisitor()
+        >>> e.accept(ev, None)
+        5
+        """
         return visitor.visit_div(self, arg)
 
 
 class Leq(BinaryExpression):
     """
     This class represents comparison of two expressions using the
-    less-than-or-equal comparator. The semantics of such an expression is a
+    less-than-or-equal comparator. The acceptuation of such an expression is a
     boolean value that is true if the left operand is less than or equal the
     right operand. It is false otherwise.
     """
 
     def accept(self, visitor, arg):
+        """
+        Comparisons don't need to be implemented for this exercise.
+        """
         return visitor.visit_leq(self, arg)
 
 
 class Lth(BinaryExpression):
     """
     This class represents comparison of two expressions using the
-    less-than comparison operator. The semantics of such an expression is a
+    less-than comparison operator. The acceptuation of such an expression is a
     boolean value that is true if the left operand is less than the right
     operand. It is false otherwise.
     """
 
     def accept(self, visitor, arg):
+        """
+        Comparisons don't need to be implemented for this exercise.
+        """
         return visitor.visit_lth(self, arg)
 
 
@@ -182,6 +229,19 @@ class Neg(UnaryExpression):
     """
 
     def accept(self, visitor, arg):
+        """
+        Example:
+        >>> n = Num(3)
+        >>> e = Neg(n)
+        >>> ev = EvalVisitor()
+        >>> e.accept(ev, None)
+        -3
+        >>> n = Num(0)
+        >>> e = Neg(n)
+        >>> ev = EvalVisitor()
+        >>> e.accept(ev, None)
+        0
+        """
         return visitor.visit_neg(self, arg)
 
 
@@ -192,60 +252,29 @@ class Not(UnaryExpression):
     """
 
     def accept(self, visitor, arg):
+        """
+        No need to implement negation for this exercise, for we don't even have
+        booleans at this point.
+        """
         return visitor.visit_not(self, arg)
 
 
 class Let(Expression):
     """
-    This class represents a let expression.
+    This class represents a let expression. The semantics of a let expression,
+    such as "let v <- e0 in e1" on an environment env is as follows:
+    1. Evaluate e0 in the environment env, yielding e0_val
+    2. Evaluate e1 in the new environment env' = env + {v:e0_val}
     """
 
-    def __init__(self, identifier, tp_var, exp_def, exp_body):
+    def __init__(self, identifier, exp_def, exp_body):
         self.identifier = identifier
-        self.tp_var = tp_var
         self.exp_def = exp_def
         self.exp_body = exp_body
 
     def accept(self, visitor, arg):
+        """
+        We don't have bindings at this point. So, nothing to be done here, for
+        this exercise.
+        """
         return visitor.visit_let(self, arg)
-
-
-class Fn(Expression):
-    """
-    This class represents an anonymous function.
-    """
-
-    def __init__(self, formal, tp_var, body):
-        self.formal = formal
-        self.tp_var = tp_var
-        self.body = body
-
-    def accept(self, visitor, arg):
-        return visitor.visit_fn(self, arg)
-
-
-class App(Expression):
-    """
-    This class represents a function application, such as 'e0 e1'.
-    """
-
-    def __init__(self, function, actual):
-        self.function = function
-        self.actual = actual
-
-    def accept(self, visitor, arg):
-        return visitor.visit_app(self, arg)
-
-
-class IfThenElse(Expression):
-    """
-    This class represents a conditional expression.
-    """
-
-    def __init__(self, cond, e0, e1):
-        self.cond = cond
-        self.e0 = e0
-        self.e1 = e1
-
-    def accept(self, visitor, arg):
-        return visitor.visit_ifThenElse(self, arg)
