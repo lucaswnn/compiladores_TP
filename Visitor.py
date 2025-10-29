@@ -1,6 +1,7 @@
 import sys
 from abc import ABC, abstractmethod
 from Expression import *
+import Asm as AsmModule
 
 
 class Visitor(ABC):
@@ -27,14 +28,6 @@ class Visitor(ABC):
 
     @abstractmethod
     def visit_eql(self, exp, arg):
-        pass
-
-    @abstractmethod
-    def visit_and(self, exp, arg):
-        pass
-
-    @abstractmethod
-    def visit_or(self, exp, arg):
         pass
 
     @abstractmethod
@@ -73,355 +66,424 @@ class Visitor(ABC):
     def visit_let(self, exp, arg):
         pass
 
-    @abstractmethod
-    def visit_ifThenElse(self, exp, arg):
-        pass
 
-    @abstractmethod
-    def visit_fn(self, exp, arg):
-        pass
-
-    @abstractmethod
-    def visit_app(self, exp, arg):
-        pass
-
-
-class ArrowType:
+class GenVisitor(Visitor):
     """
-    This is the class that represents function types. A function type is just
-    that: the type of a function. Function types are also called "arrow types",
-    because they tend to be represented as 't0 -> t1'. Thus, an arrow type
-    has two parts: the head type (t0) and the tail type (t1).
-
-    Usage:
-        >>> t = ArrowType(type(1), type(True))
-        >>> t.hd == type(1) and t.tl == type(True)
-        True
-
-        >>> t = ArrowType(type(1), type(True))
-        >>> str(t)
-        "<class 'int'> -> <class 'bool'>"
+    The GenVisitor class compiles arithmetic expressions into a low-level
+    language.
     """
 
-    def __init__(self, tp_formal, tp_body):
-        self.hd = tp_formal
-        self.tl = tp_body
+    def __init__(self):
+        self.next_var_counter = 0
 
-    def __eq__(self, other):
-        """
-        Two arrow types are equal if their head and tail are equal.
-        Example:
-            >>> t0 = ArrowType(type(1), ArrowType(type(1), type(1)))
-            >>> t1 = ArrowType(type(1), ArrowType(type(1), type(1)))
-            >>> t0 == t1
-            True
-        """
-        if isinstance(other, ArrowType):
-            return self.hd == other.hd and self.tl == other.tl
-        else:
-            return False
+    def next_var_name(self):
+        self.next_var_counter += 1
+        return f"v{self.next_var_counter}"
 
-    def __repr__(self):
-        if isinstance(self.hd, ArrowType):
-            hd_str = f"( {str(self.hd)} )"
-        else:
-            hd_str = str(self.hd)
-        if isinstance(self.tl, ArrowType):
-            tl_str = f"( {str(self.tl)} )"
-        else:
-            tl_str = str(self.tl)
-        return f"{hd_str} -> {tl_str}"
-
-
-class TypeCheckVisitor(Visitor):
-    """
-    The TypeCheckVisitor class evaluates logical and arithmetic expressions. The
-    result of evaluating an expression is the value of that expression. The
-    inherited attribute propagated throughout visits is the environment that
-    associates the names of variables with values.
-    """
-
-    def visit_var(self, exp, env):
+    def visit_var(self, exp, prog):
         """
         Usage:
-            >>> e = Var('t')
-            >>> ev = TypeCheckVisitor()
-            >>> e.accept(ev, {'t':type(1)})
-            <class 'int'>
-
-            >>> e = Var('t')
-            >>> ev = TypeCheckVisitor()
-            >>> e.accept(ev, {'t':ArrowType(type(1), type(True))})
-            <class 'int'> -> <class 'bool'>
+            >>> e = Var('x')
+            >>> p = AsmModule.Program({"x":1}, [])
+            >>> g = GenVisitor()
+            >>> v = e.accept(g, p)
+            >>> p.eval()
+            >>> p.get_val(v)
+            1
         """
-        if exp.identifier in env:
-            return env[exp.identifier]
-        else:
-            sys.exit("Def error")
+        return exp.identifier
 
-    def visit_bln(self, exp, env):
+    def visit_bln(self, exp, prog):
         """
         Usage:
             >>> e = Bln(True)
-            >>> ev = TypeCheckVisitor()
-            >>> e.accept(ev, None)
-            <class 'bool'>
-        """
-        return type(exp.bln)
+            >>> p = AsmModule.Program({}, [])
+            >>> g = GenVisitor()
+            >>> v = e.accept(g, p)
+            >>> p.eval()
+            >>> p.get_val(v)
+            1
 
-    def visit_num(self, exp, env):
+            >>> e = Bln(False)
+            >>> p = AsmModule.Program({}, [])
+            >>> g = GenVisitor()
+            >>> v = e.accept(g, p)
+            >>> p.eval()
+            >>> p.get_val(v)
+            0
         """
-        Usage:
-            >>> e = Num(1)
-            >>> ev = TypeCheckVisitor()
-            >>> e.accept(ev, None)
-            <class 'int'>
-        """
-        return type(exp.num)
-
-    def visit_eql(self, exp, env):  # Implemented for you :)
-        """
-        Usage:
-            >>> e = Eql(Num(1), Num(2))
-            >>> ev = TypeCheckVisitor()
-            >>> e.accept(ev, None)
-            <class 'bool'>
-        """
-        if exp.left.accept(self, env) == exp.right.accept(self, env):
-            return type(True)
+        if exp.bln:
+            var_name = self.next_var_name()
+            prog.add_inst(AsmModule.Addi(var_name, "x0", 1))
+            return var_name
         else:
-            sys.exit("Type error")
+            return "x0"
 
-    def visit_and(self, exp, env):
+    def visit_num(self, exp, prog):
         """
         Usage:
-            >>> e = And(Bln(True), Bln(False))
-            >>> ev = TypeCheckVisitor()
-            >>> e.accept(ev, None)
-            <class 'bool'>
+            >>> e = Num(13)
+            >>> p = AsmModule.Program({}, [])
+            >>> g = GenVisitor()
+            >>> v = e.accept(g, p)
+            >>> p.eval()
+            >>> p.get_val(v)
+            13
         """
-        if (exp.left.accept(self, env) == type(True) and
-                exp.right.accept(self, env) == type(True)):
-            return type(True)
-        else:
-            sys.exit("Type error")
+        v_name = self.next_var_name()
+        prog.add_inst(AsmModule.Addi(v_name, "x0", exp.num))
+        return v_name
 
-    def visit_or(self, exp, env):
+    def visit_eql(self, exp, prog):
+        """
+        >>> e = Eql(Num(13), Num(13))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        1
+
+        >>> e = Eql(Num(13), Num(10))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        0
+
+        >>> e = Eql(Num(-1), Num(1))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        0
+        """
+        l_name = exp.left.accept(self, prog)
+        r_name = exp.right.accept(self, prog)
+
+        l_less_r_name = self.next_var_name()
+        prog.add_inst(AsmModule.Slt(l_less_r_name, l_name, r_name))
+
+        r_less_l_name = self.next_var_name()
+        prog.add_inst(AsmModule.Slt(r_less_l_name, r_name, l_name))
+
+        is_different_name = self.next_var_name()
+        prog.add_inst(AsmModule.Add(is_different_name, l_less_r_name, r_less_l_name))
+
+        v_name = self.next_var_name()
+        prog.add_inst(AsmModule.Xori(v_name, is_different_name, 1))
+        return v_name
+
+    def visit_add(self, exp, prog):
+        """
+        >>> e = Add(Num(13), Num(-13))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        0
+
+        >>> e = Add(Num(13), Num(10))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        23
+        """
+        l_name = exp.left.accept(self, prog)
+        r_name = exp.right.accept(self, prog)
+        v_name = self.next_var_name()
+        prog.add_inst(AsmModule.Add(v_name, l_name, r_name))
+        return v_name
+
+    def visit_sub(self, exp, prog):
+        """
+        >>> e = Sub(Num(13), Num(-13))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        26
+
+        >>> e = Sub(Num(13), Num(10))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        3
+        """
+        l_name = exp.left.accept(self, prog)
+        r_name = exp.right.accept(self, prog)
+        v_name = self.next_var_name()
+        prog.add_inst(AsmModule.Sub(v_name, l_name, r_name))
+        return v_name
+
+    def visit_mul(self, exp, prog):
+        """
+        >>> e = Mul(Num(13), Num(2))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        26
+
+        >>> e = Mul(Num(13), Num(10))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        130
+        """
+        l_name = exp.left.accept(self, prog)
+        r_name = exp.right.accept(self, prog)
+        v_name = self.next_var_name()
+        prog.add_inst(AsmModule.Mul(v_name, l_name, r_name))
+        return v_name
+
+    def visit_div(self, exp, prog):
+        """
+        >>> e = Div(Num(13), Num(2))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        6
+
+        >>> e = Div(Num(13), Num(10))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        1
+        """
+        l_name = exp.left.accept(self, prog)
+        r_name = exp.right.accept(self, prog)
+        v_name = self.next_var_name()
+        prog.add_inst(AsmModule.Div(v_name, l_name, r_name))
+        return v_name
+
+    def visit_leq(self, exp, prog):
+        """
+        >>> e = Leq(Num(3), Num(2))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        0
+
+        >>> e = Leq(Num(3), Num(3))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        1
+
+        >>> e = Leq(Num(2), Num(3))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        1
+
+        >>> e = Leq(Num(-3), Num(-2))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        1
+
+        >>> e = Leq(Num(-3), Num(-3))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        1
+
+        >>> e = Leq(Num(-2), Num(-3))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        0
+        """
+        l_name = exp.left.accept(self, prog)
+        r_name = exp.right.accept(self, prog)
+
+        is_r_less_l_name = self.next_var_name()
+        prog.add_inst(AsmModule.Slt(is_r_less_l_name, r_name, l_name))
+
+        v_name = self.next_var_name()
+        prog.add_inst(AsmModule.Xori(v_name, is_r_less_l_name, 1))
+        return v_name
+
+    def visit_lth(self, exp, prog):
+        """
+        >>> e = Lth(Num(3), Num(2))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        0
+
+        >>> e = Lth(Num(3), Num(3))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        0
+
+        >>> e = Lth(Num(2), Num(3))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        1
+        """
+        l_name = exp.left.accept(self, prog)
+        r_name = exp.right.accept(self, prog)
+
+        v_name = self.next_var_name()
+        prog.add_inst(AsmModule.Slt(v_name, l_name, r_name))
+        return v_name
+
+    def visit_neg(self, exp, prog):
+        """
+        >>> e = Neg(Num(3))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        -3
+
+        >>> e = Neg(Num(0))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        0
+
+        >>> e = Neg(Num(-3))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        3
+        """
+        name = exp.exp.accept(self, prog)
+        v_name = self.next_var_name()
+        prog.add_inst(AsmModule.Sub(v_name, "x0", name))
+        return v_name
+
+    def visit_not(self, exp, prog):
+        """
+        >>> e = Not(Bln(True))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        0
+
+        >>> e = Not(Bln(False))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        1
+
+        >>> e = Not(Num(0))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        1
+
+        >>> e = Not(Num(-2))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        0
+
+        >>> e = Not(Num(2))
+        >>> p = AsmModule.Program({}, [])
+        >>> g = GenVisitor()
+        >>> v = e.accept(g, p)
+        >>> p.eval()
+        >>> p.get_val(v)
+        0
+        """
+        val = exp.exp.accept(self, prog)
+        
+        is_neg = self.next_var_name()
+        is_pos = self.next_var_name()
+
+        prog.add_inst(AsmModule.Slt(is_neg, val, "x0"))
+        prog.add_inst(AsmModule.Slt(is_pos, "x0", val))
+
+        is_not_zero = self.next_var_name()
+        prog.add_inst(AsmModule.Add(is_not_zero, is_neg, is_pos))
+
+        v_name = self.next_var_name()
+        prog.add_inst(AsmModule.Xori(v_name, is_not_zero, 1))
+        return v_name
+
+    def visit_let(self, exp, prog):
         """
         Usage:
-            >>> e = Or(Bln(True), Bln(False))
-            >>> ev = TypeCheckVisitor()
-            >>> e.accept(ev, None)
-            <class 'bool'>
-        """
-        if (exp.left.accept(self, env) == type(True) and
-                exp.right.accept(self, env) == type(True)):
-            return type(True)
-        else:
-            sys.exit("Type error")
+            >>> e = Let('v', Not(Bln(False)), Var('v'))
+            >>> p = AsmModule.Program({}, [])
+            >>> g = GenVisitor()
+            >>> v = e.accept(g, p)
+            >>> p.eval()
+            >>> p.get_val(v)
+            1
 
-    def visit_add(self, exp, env):
-        """
-        Usage:
-            >>> e = Add(Num(1), Num(2))
-            >>> ev = TypeCheckVisitor()
-            >>> e.accept(ev, None)
-            <class 'int'>
-        """
-        if (exp.left.accept(self, env) == type(1) and
-                exp.right.accept(self, env) == type(1)):
-            return type(1)
-        else:
-            sys.exit("Type error")
+            >>> e = Let('v', Num(2), Add(Var('v'), Num(3)))
+            >>> p = AsmModule.Program({}, [])
+            >>> g = GenVisitor()
+            >>> v = e.accept(g, p)
+            >>> p.eval()
+            >>> p.get_val(v)
+            5
 
-    def visit_sub(self, exp, env):
+            >>> e0 = Let('x', Num(2), Add(Var('x'), Num(3)))
+            >>> e1 = Let('y', e0, Mul(Var('y'), Num(10)))
+            >>> p = AsmModule.Program({}, [])
+            >>> g = GenVisitor()
+            >>> v = e1.accept(g, p)
+            >>> p.eval()
+            >>> p.get_val(v)
+            50
         """
-        Usage:
-            >>> e = Sub(Num(1), Num(2))
-            >>> ev = TypeCheckVisitor()
-            >>> e.accept(ev, None)
-            <class 'int'>
-        """
-        if (exp.left.accept(self, env) == type(1) and
-                exp.right.accept(self, env) == type(1)):
-            return type(1)
-        else:
-            sys.exit("Type error")
+        exp_def_name = exp.exp_def.accept(self, prog)
+        prog.add_inst(AsmModule.Add(exp.identifier, exp_def_name, "x0"))
 
-    def visit_mul(self, exp, env):
-        """
-        Usage:
-            >>> e = Mul(Num(1), Num(2))
-            >>> ev = TypeCheckVisitor()
-            >>> e.accept(ev, None)
-            <class 'int'>
-        """
-        if (exp.left.accept(self, env) == type(1) and
-                exp.right.accept(self, env) == type(1)):
-            return type(1)
-        else:
-            sys.exit("Type error")
+        exp_body_name = exp.exp_body.accept(self, prog)
 
-    def visit_div(self, exp, env):
-        """
-        Usage:
-            >>> e = Div(Num(1), Num(0))
-            >>> ev = TypeCheckVisitor()
-            >>> e.accept(ev, None)
-            <class 'int'>
-        """
-        if (exp.left.accept(self, env) == type(1) and
-                exp.right.accept(self, env) == type(1)):
-            return type(1)
-        else:
-            sys.exit("Type error")
-
-    def visit_leq(self, exp, env):
-        """
-        Usage:
-            >>> e = Leq(Num(1), Num(0))
-            >>> ev = TypeCheckVisitor()
-            >>> e.accept(ev, None)
-            <class 'bool'>
-        """
-        if (exp.left.accept(self, env) == type(1) and
-                exp.right.accept(self, env) == type(1)):
-            return type(True)
-        else:
-            sys.exit("Type error")
-
-    def visit_lth(self, exp, env):
-        """
-        Usage:
-            >>> e = Lth(Num(1), Num(0))
-            >>> ev = TypeCheckVisitor()
-            >>> e.accept(ev, None)
-            <class 'bool'>
-        """
-        if (exp.left.accept(self, env) == type(1) and
-                exp.right.accept(self, env) == type(1)):
-            return type(True)
-        else:
-            sys.exit("Type error")
-
-    def visit_neg(self, exp, env):
-        """
-        Usage:
-            >>> e = Neg(Num(1))
-            >>> ev = TypeCheckVisitor()
-            >>> e.accept(ev, None)
-            <class 'int'>
-        """
-        if exp.exp.accept(self, env) == type(1):
-            return type(1)
-        else:
-            sys.exit("Type error")
-
-    def visit_not(self, exp, env):
-        """
-        Usage:
-            >>> e = Not(Bln(False))
-            >>> ev = TypeCheckVisitor()
-            >>> e.accept(ev, None)
-            <class 'bool'>
-        """
-        if exp.exp.accept(self, env) == type(True):
-            return type(True)
-        else:
-            sys.exit("Type error")
-
-    def visit_ifThenElse(self, exp, env):
-        """
-        Usage:
-            >>> e0 = Lth(Num(1), Num(0))
-            >>> e = IfThenElse(e0, Bln(True), e0)
-            >>> ev = TypeCheckVisitor()
-            >>> e.accept(ev, {})
-            <class 'bool'>
-
-            >>> e0 = Lth(Num(1), Num(0))
-            >>> e = IfThenElse(e0, Var('v'), Var('w'))
-            >>> ev = TypeCheckVisitor()
-            >>> tp0 = ArrowType(type(1), type(2))
-            >>> tp1 = ArrowType(type(3), type(4))
-            >>> e.accept(ev, {'v':tp0, 'w':tp1})
-            <class 'int'> -> <class 'int'>
-        """
-        cond = exp.cond.accept(self, env)
-        e0_type = exp.e0.accept(self, env)
-        e1_type = exp.e1.accept(self, env)
-        if cond == type(True) and e0_type == e1_type:
-            return e0_type
-        else:
-            sys.exit("Type error")
-
-    def visit_let(self, exp, env):
-        """
-        Usage:
-            >>> e = Let('v', type(True), Not(Bln(False)), Var('v'))
-            >>> ev = TypeCheckVisitor()
-            >>> e.accept(ev, {})
-            <class 'bool'>
-
-            >>> e = Let('v', type(1), Num(2), Add(Var('v'), Num(3)))
-            >>> ev = TypeCheckVisitor()
-            >>> e.accept(ev, {})
-            <class 'int'>
-        """
-        exp_def_type = exp.exp_def.accept(self, env)
-        if exp_def_type != exp.tp_var:
-            sys.exit("Type error")
-
-        new_env = dict(env)
-        new_env[exp.identifier] = exp_def_type
-        return exp.exp_body.accept(self, new_env)
-
-    def visit_fn(self, exp, env):
-        """
-        Usage:
-            >>> e = Fn('v', type(True), Var('v'))
-            >>> ev = TypeCheckVisitor()
-            >>> e.accept(ev, {})
-            <class 'bool'> -> <class 'bool'>
-
-            >>> e = Fn('v', type(1), Add(Var('v'), Num(3)))
-            >>> ev = TypeCheckVisitor()
-            >>> e.accept(ev, {})
-            <class 'int'> -> <class 'int'>
-
-            >>> e0 = Fn('y', type(1), Add(Var('y'), Var('x')))
-            >>> e1 = Fn('x', type(1), e0)
-            >>> ev = TypeCheckVisitor()
-            >>> e1.accept(ev, {})
-            <class 'int'> -> ( <class 'int'> -> <class 'int'> )
-        """
-        new_env = dict(env)
-        new_env[exp.formal] = exp.tp_var
-        body_type = exp.body.accept(self, new_env)
-        return ArrowType(exp.tp_var, body_type)
-
-    def visit_app(self, exp, env):
-        """
-        Usage:
-            >>> e0 = Fn('v', type(1), Add(Var('v'), Num(3)))
-            >>> e1 = App(e0, Num(1))
-            >>> ev = TypeCheckVisitor()
-            >>> e1.accept(ev, {})
-            <class 'int'>
-
-            >>> e0 = Fn('y', type(1), Add(Var('y'), Var('x')))
-            >>> e1 = Fn('x', type(1), e0)
-            >>> e2 = App(e1, Num(1))
-            >>> ev = TypeCheckVisitor()
-            >>> e2.accept(ev, {})
-            <class 'int'> -> <class 'int'>
-        """
-        f_type = exp.function.accept(self, env)
-        if not isinstance(f_type, ArrowType):
-            sys.exit("Type error")
-
-        actual_type = exp.actual.accept(self, env)
-        if actual_type != f_type.hd:
-            sys.exit("Type error")
-
-        return f_type.tl
+        return exp_body_name

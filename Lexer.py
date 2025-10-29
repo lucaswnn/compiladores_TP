@@ -36,29 +36,18 @@ class TokenType(enum.Enum):
     LET = 8  # The 'let' of the let expression
     INX = 9  # The 'in' of the let expression
     END = 10  # The 'end' of the let expression
-    EQL = 201  # x = y
-    ADD = 202  # x + y
-    SUB = 203  # x - y
-    MUL = 204  # x * y
-    DIV = 205  # x div y
-    LEQ = 206  # x <= y
-    LTH = 207  # x < y
-    NEG = 208  # ~x
-    NOT = 209  # not x
-    LPR = 210  # (
-    RPR = 211  # )
+    EQL = 201
+    ADD = 202
+    SUB = 203
+    MUL = 204
+    DIV = 205
+    LEQ = 206
+    LTH = 207
+    NEG = 208
+    NOT = 209
+    LPR = 210
+    RPR = 211
     ASN = 212  # The assignment '<-' operator
-    ORX = 213  # x or y
-    AND = 214  # x and y
-    IFX = 215  # The 'if' of a conditional expression
-    THN = 216  # The 'then' of a conditional expression
-    ELS = 217  # The 'else' of a conditional expression
-    FNX = 218  # The 'fn' that declares an anonymous function
-    ARW = 219  # The '=>' that separates the parameter from the body of function
-    TPF = 220  # The arrow that indicates a function type
-    COL = 221  # The colon that separates type annotations
-    INT = 222  # The int type ('int')
-    LGC = 223  # The boolean (logic) type ('bool')
 
 
 class Lexer:
@@ -1571,10 +1560,6 @@ class Lexer:
         >>> [tk.kind for tk in l.tokens()]
         [<TokenType.NUM: 3>, <TokenType.ADD: 202>, <TokenType.NUM: 3>]
 
-        >>> l = Lexer('1 * 2\\n')
-        >>> [tk.kind for tk in l.tokens()]
-        [<TokenType.NUM: 3>, <TokenType.MUL: 204>, <TokenType.NUM: 3>]
-
         >>> l = Lexer('1 * 2 -- 3\\n')
         >>> [tk.kind for tk in l.tokens()]
         [<TokenType.NUM: 3>, <TokenType.MUL: 204>, <TokenType.NUM: 3>]
@@ -1586,14 +1571,6 @@ class Lexer:
         >>> l = Lexer("let v <- 2 in v end")
         >>> [tk.kind.name for tk in l.tokens()]
         ['LET', 'VAR', 'ASN', 'NUM', 'INX', 'VAR', 'END']
-
-        >>> l = Lexer("v: int -> int")
-        >>> [tk.kind.name for tk in l.tokens()]
-        ['VAR', 'COL', 'INT', 'TPF', 'INT']
-
-        >>> l = Lexer("v: int -> bool")
-        >>> [tk.kind.name for tk in l.tokens()]
-        ['VAR', 'COL', 'INT', 'TPF', 'LGC']
         """
         token = self.getToken()
         while token.kind != TokenType.EOF:

@@ -3,6 +3,7 @@ from Expression import *
 from Visitor import *
 from Lexer import Lexer
 from Parser import Parser
+import Asm as AsmModule
 
 if __name__ == "__main__":
     """
@@ -13,5 +14,8 @@ if __name__ == "__main__":
     lexer = Lexer(text)
     parser = Parser(lexer.tokens())
     exp = parser.parse()
-    visitor = TypeCheckVisitor()
-    print(f"{exp.accept(visitor, {})}")
+    prog = AsmModule.Program({}, [])
+    gen = GenVisitor()
+    var_answer = exp.accept(gen, prog)
+    prog.eval()
+    print(f"{prog.get_val(var_answer)}")
