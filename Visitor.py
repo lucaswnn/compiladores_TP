@@ -67,6 +67,122 @@ class Visitor(ABC):
         pass
 
 
+class RenameVisitor(ABC):
+    def generate_unique_name(self, var_name, scope):
+        """
+        Generates a unique name for the variable to avoid shadowing.
+        """
+        if var_name not in scope:
+            scope[var_name] = []
+
+        # Create a unique name by appending a counter or unique suffix
+        unique_name = f"{var_name}_{len(scope[var_name])}"
+
+        # Push the unique name onto the stack for this variable
+        scope[var_name].append(unique_name)
+
+        return unique_name
+
+    def pop_variable(self, var_name, scope):
+        """
+        Pops the variable name off the stack when exiting a scope.
+        """
+        if var_name in scope and scope[var_name]:
+            scope[var_name].pop()
+
+    def get_current_var_name(self, var_name, scope):
+        """
+        Returns the current variable name (the one on top of the stack).
+        """
+        if var_name in scope and scope[var_name]:
+            return scope[var_name][-1]
+        return var_name # If no stack entry, return the original nam
+
+    """
+    This visitor traverses the AST of a program, renaming variables to ensure
+    that they all have different names.
+
+    Usage:
+        >>> e0 = Let('x', Num(2), Add(Var('x'), Num(3)))
+        >>> e1 = Let('x', e0, Mul(Var('x'), Num(10)))
+        >>> e0.identifier == e1.identifier
+        True
+
+        >>> e0 = Let('x', Num(2), Add(Var('x'), Num(3)))
+        >>> e1 = Let('x', e0, Mul(Var('x'), Num(10)))
+        >>> r = RenameVisitor()
+        >>> e1.accept(r, {})
+        >>> e0.identifier == e1.identifier
+        False
+
+        >>> x0 = Var('x')
+        >>> x1 = Var('x')
+        >>> e0 = Let('x', Num(2), Add(x0, Num(3)))
+        >>> e1 = Let('x', e0, Mul(x1, Num(10)))
+        >>> x0.identifier == x1.identifier
+        True
+
+        >>> x0 = Var('x')
+        >>> x1 = Var('x')
+        >>> e0 = Let('x', Num(2), Add(x0, Num(3)))
+        >>> e1 = Let('x', e0, Mul(x1, Num(10)))
+        >>> r = RenameVisitor()
+        >>> e1.accept(r, {})
+        >>> x0.identifier == x1.identifier
+        False
+    """
+
+    def visit_var(self, exp, arg):
+        exp.identifier = self.get_current_var_name(exp.identifier, arg)
+
+    def visit_bln(self, exp, arg):
+        pass
+
+    def visit_num(self, exp, arg):
+        pass
+
+    def visit_eql(self, exp, arg):
+        exp.left.accept(self, arg)
+        exp.right.accept(self, arg)
+
+    def visit_add(self, exp, arg):
+        exp.left.accept(self, arg)
+        exp.right.accept(self, arg)
+
+    def visit_sub(self, exp, arg):
+        exp.left.accept(self, arg)
+        exp.right.accept(self, arg)
+
+    def visit_mul(self, exp, arg):
+        exp.left.accept(self, arg)
+        exp.right.accept(self, arg)
+
+    def visit_div(self, exp, arg):
+        exp.left.accept(self, arg)
+        exp.right.accept(self, arg)
+
+    def visit_leq(self, exp, arg):
+        exp.left.accept(self, arg)
+        exp.right.accept(self, arg)
+
+    def visit_lth(self, exp, arg):
+        exp.left.accept(self, arg)
+        exp.right.accept(self, arg)
+
+    def visit_neg(self, exp, arg):
+        exp.exp.accept(self, arg)
+
+    def visit_not(self, exp, arg):
+        exp.exp.accept(self, arg)
+
+    def visit_let(self, exp, arg):
+        exp.exp_def.accept(self, arg)
+        unique_name = self.generate_unique_name(exp.identifier, arg)
+        exp.exp_body.accept(self, arg)
+        self.pop_variable(exp.identifier, arg)
+        exp.identifier = unique_name
+
+
 class GenVisitor(Visitor):
     """
     The GenVisitor class compiles arithmetic expressions into a low-level
@@ -170,7 +286,8 @@ class GenVisitor(Visitor):
         prog.add_inst(AsmModule.Slt(r_less_l_name, r_name, l_name))
 
         is_different_name = self.next_var_name()
-        prog.add_inst(AsmModule.Add(is_different_name, l_less_r_name, r_less_l_name))
+        prog.add_inst(AsmModule.Add(is_different_name,
+                      l_less_r_name, r_less_l_name))
 
         v_name = self.next_var_name()
         prog.add_inst(AsmModule.Xori(v_name, is_different_name, 1))
@@ -439,7 +556,7 @@ class GenVisitor(Visitor):
         0
         """
         val = exp.exp.accept(self, prog)
-        
+
         is_neg = self.next_var_name()
         is_pos = self.next_var_name()
 
