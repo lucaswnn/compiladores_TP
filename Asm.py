@@ -13,6 +13,8 @@ values. The following instructions are recognized:
     * div rd, rs1, rs2: rd = rs1 // rs2 (signed integer division)
     * slt rd, rs1, rs2: rd = (rs1 < rs2) ? 1 : 0 (signed comparison)
     * slti rd, rs1, imm: rd = (rs1 < imm) ? 1 : 0
+    * beq rs1, rs2, lab: pc = lab if rs1 == rs2 else pc + 1
+    * jal rd, lab: rd = pc + 1 and pc = lab
 
 This file uses doctests all over. To test it, just run python 3 as follows:
 "python3 -m doctest Asm.py". The program uses syntax that is excluive of
@@ -46,14 +48,21 @@ class Program:
         else:
             return None
 
+    def get_number_of_instructions(self):
+        return len(self.__insts)
+
     def add_inst(self, inst):
         self.__insts.append(inst)
+
+    def get_pc(self):
+        return self.pc
 
     def set_pc(self, pc):
         self.pc = pc
 
     def set_val(self, name, value):
-        self.__env[name] = value
+        if name != "x0":  # Can't change x0, which is always zero.
+            self.__env[name] = value
 
     def get_val(self, name):
         """
@@ -73,8 +82,11 @@ class Program:
             print(f"{name}: {val}")
 
     def print_insts(self):
+        counter = 0
         for inst in self.__insts:
-            print(inst)
+            print("%03d: %s" % (counter, str(inst)))
+            counter += 1
+        print("%03d: %s" % (counter, "END"))
 
     def eval(self):
         """
@@ -82,15 +94,25 @@ class Program:
         evaluate.
 
         Example:
-            >>> insts = [Add("x0", "b0", "b1"), Sub("x1", "x0", "b2")]
+            >>> insts = [Add("t0", "b0", "b1"), Sub("x1", "t0", "b2")]
             >>> p = Program({"b0":2, "b1":3, "b2": 4}, insts)
             >>> p.eval()
             >>> p.print_env()
             b0: 2
             b1: 3
             b2: 4
-            x0: 5
+            t0: 5
+            x0: 0
             x1: 1
+
+       Notice that it is not possible to change 'x0':
+            >>> insts = [Add("x0", "b0", "b1")]
+            >>> p = Program({"b0":2, "b1":3}, insts)
+            >>> p.eval()
+            >>> p.print_env()
+            b0: 2
+            b1: 3
+            x0: 0
         """
         inst = self.get_inst()
         while inst:
@@ -169,6 +191,72 @@ class Inst(ABC):
         raise NotImplementedError
 
 
+class BranchOp(Inst):
+    """
+    The general class of branching instructions. These instructions can change
+    the control flow of a program. Normally, the next instruction is given by
+    pc + 1. A branch might change pc to point out to a different label..
+    """
+
+    def set_target(self, lab):
+        assert (isinstance(lab, int))
+        self.lab = lab
+
+
+class Beq(BranchOp):
+    """
+    beq rs1, rs2, lab:
+    Jumps to label lab if the value in rs1 is equal to the value in rs2.
+    """
+
+    def __init__(self, rs1, rs2, lab=None):
+        assert isinstance(rs1, str) and isinstance(rs2, str)
+        self.rs1 = rs1
+        self.rs2 = rs2
+        if lab != None:
+            assert isinstance(lab, int)
+        self.lab = lab
+
+    def get_opcode(self):
+        return "beq"
+
+    def __str__(self):
+        op = self.get_opcode()
+        return f"{op} {self.rs1} {self.rs2} {self.lab}"
+
+    def eval(self, prog):
+        if prog.get_val(self.rs1) == prog.get_val(self.rs2):
+            prog.set_pc(self.lab)
+
+
+class Jal(BranchOp):
+    """
+    jal rd lab:
+    Stores the return address (PC+1) on register rd, then jumps to label lab.
+    If rd is x0, then it does not write on the register. In this case, notice
+    that `jal x0 lab` is equivalent to an unconditional jump to `lab`.
+    """
+
+    def __init__(self, rd, lab=None):
+        assert isinstance(rd, str)
+        self.rd = rd
+        if lab != None:
+            assert isinstance(lab, int)
+        self.lab = lab
+
+    def get_opcode(self):
+        return "jal"
+
+    def __str__(self):
+        op = self.get_opcode()
+        return f"{op} {self.rd} {self.lab}"
+
+    def eval(self, prog):
+        if self.rd != "x0":
+            self.rd = prog.get_pc + 1
+        prog.set_pc(self.lab)
+
+
 class BinOp(Inst):
     """
     The general class of binary instructions. These instructions define a
@@ -176,8 +264,8 @@ class BinOp(Inst):
     """
 
     def __init__(self, rd, rs1, rs2):
-        assert isinstance(rd, str) and isinstance(
-            rs1, str) and isinstance(rs2, str)
+        assert isinstance(rd, str) and isinstance(rs1, str) and \
+            isinstance(rs2, str)
         self.rd = rd
         self.rs1 = rs1
         self.rs2 = rs2
