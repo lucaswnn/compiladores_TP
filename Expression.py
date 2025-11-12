@@ -1,8 +1,3 @@
-"""
-This file implements the data structures that represent Expressions. You don't
-need to modify it for this assignment.
-"""
-
 from abc import ABC, abstractmethod
 from Visitor import *
 
@@ -23,26 +18,20 @@ class Var(Expression):
         self.identifier = identifier
 
     def accept(self, visitor, arg):
-        """
-        Variables don't need to be implemented for this exercise.
-        """
         return visitor.visit_var(self, arg)
 
 
 class Bln(Expression):
     """
     This class represents expressions that are boolean values. There are only
-    two boolean values: true and false. The acceptuation of such an expression
-    is the boolean itself.
+    two boolean values: true and false. The acceptuation of such an expression is
+    the boolean itself.
     """
 
     def __init__(self, bln):
         self.bln = bln
 
     def accept(self, visitor, arg):
-        """
-        booleans don't need to be implemented for this exercise.
-        """
         return visitor.visit_bln(self, arg)
 
 
@@ -56,13 +45,6 @@ class Num(Expression):
         self.num = num
 
     def accept(self, visitor, arg):
-        """
-        Example:
-        >>> e = Num(3)
-        >>> ev = EvalVisitor()
-        >>> e.accept(ev, None)
-        3
-        """
         return visitor.visit_num(self, arg)
 
 
@@ -89,9 +71,6 @@ class Eql(BinaryExpression):
     """
 
     def accept(self, visitor, arg):
-        """
-        Equality doesn't need to be implemented for this exercise.
-        """
         return visitor.visit_eql(self, arg)
 
 
@@ -102,34 +81,38 @@ class Add(BinaryExpression):
     """
 
     def accept(self, visitor, arg):
-        """
-        Example:
-        >>> n1 = Num(3)
-        >>> n2 = Num(4)
-        >>> e = Add(n1, n2)
-        >>> ev = EvalVisitor()
-        >>> e.accept(ev, None)
-        7
-        """
         return visitor.visit_add(self, arg)
+
+
+class And(BinaryExpression):
+    """
+    This class represents the logical disjunction of two boolean expressions.
+    The evaluation of an expression of this kind is the logical AND of the two
+    subexpression's values.
+    """
+
+    def accept(self, visitor, arg):
+        return visitor.visit_and(self, arg)
+
+
+class Or(BinaryExpression):
+    """
+    This class represents the logical conjunction of two boolean expressions.
+    The evaluation of an expression of this kind is the logical OR of the two
+    subexpression's values.
+    """
+
+    def accept(self, visitor, arg):
+        return visitor.visit_or(self, arg)
 
 
 class Sub(BinaryExpression):
     """
-    This class represents subtraction of two expressions. The acceptuation of
-    such an expression is the subtraction of the two subexpression's values.
+    This class represents subtraction of two expressions. The acceptuation of such
+    an expression is the subtraction of the two subexpression's values.
     """
 
     def accept(self, visitor, arg):
-        """
-        Example:
-        >>> n1 = Num(3)
-        >>> n2 = Num(4)
-        >>> e = Sub(n1, n2)
-        >>> ev = EvalVisitor()
-        >>> e.accept(ev, None)
-        -1
-        """
         return visitor.visit_sub(self, arg)
 
 
@@ -140,15 +123,6 @@ class Mul(BinaryExpression):
     """
 
     def accept(self, visitor, arg):
-        """
-        Example:
-        >>> n1 = Num(3)
-        >>> n2 = Num(4)
-        >>> e = Mul(n1, n2)
-        >>> ev = EvalVisitor()
-        >>> e.accept(ev, None)
-        12
-        """
         return visitor.visit_mul(self, arg)
 
 
@@ -160,21 +134,6 @@ class Div(BinaryExpression):
     """
 
     def accept(self, visitor, arg):
-        """
-        Example:
-        >>> n1 = Num(28)
-        >>> n2 = Num(4)
-        >>> e = Div(n1, n2)
-        >>> ev = EvalVisitor()
-        >>> e.accept(ev, None)
-        7
-        >>> n1 = Num(22)
-        >>> n2 = Num(4)
-        >>> e = Div(n1, n2)
-        >>> ev = EvalVisitor()
-        >>> e.accept(ev, None)
-        5
-        """
         return visitor.visit_div(self, arg)
 
 
@@ -187,9 +146,6 @@ class Leq(BinaryExpression):
     """
 
     def accept(self, visitor, arg):
-        """
-        Comparisons don't need to be implemented for this exercise.
-        """
         return visitor.visit_leq(self, arg)
 
 
@@ -202,9 +158,6 @@ class Lth(BinaryExpression):
     """
 
     def accept(self, visitor, arg):
-        """
-        Comparisons don't need to be implemented for this exercise.
-        """
         return visitor.visit_lth(self, arg)
 
 
@@ -229,19 +182,6 @@ class Neg(UnaryExpression):
     """
 
     def accept(self, visitor, arg):
-        """
-        Example:
-        >>> n = Num(3)
-        >>> e = Neg(n)
-        >>> ev = EvalVisitor()
-        >>> e.accept(ev, None)
-        -3
-        >>> n = Num(0)
-        >>> e = Neg(n)
-        >>> ev = EvalVisitor()
-        >>> e.accept(ev, None)
-        0
-        """
         return visitor.visit_neg(self, arg)
 
 
@@ -252,10 +192,6 @@ class Not(UnaryExpression):
     """
 
     def accept(self, visitor, arg):
-        """
-        No need to implement negation for this exercise, for we don't even have
-        booleans at this point.
-        """
         return visitor.visit_not(self, arg)
 
 
@@ -273,8 +209,24 @@ class Let(Expression):
         self.exp_body = exp_body
 
     def accept(self, visitor, arg):
-        """
-        We don't have bindings at this point. So, nothing to be done here, for
-        this exercise.
-        """
         return visitor.visit_let(self, arg)
+
+
+class IfThenElse(Expression):
+    """
+    This class represents a conditional expression. The semantics an expression
+    such as 'if B then E0 else E1' is as follows:
+    1. Evaluate B. Call the result ValueB.
+    2. If ValueB is True, then evalute E0 and return the result.
+    3. If ValueB is False, then evaluate E1 and return the result.
+    Notice that we only evaluate one of the two sub-expressions, not both. Thus,
+    "if True then 0 else 1 div 0" will return 0 indeed.
+    """
+
+    def __init__(self, cond, e0, e1):
+        self.cond = cond
+        self.e0 = e0
+        self.e1 = e1
+
+    def accept(self, visitor, arg):
+        return visitor.visit_ifThenElse(self, arg)

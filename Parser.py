@@ -4,30 +4,20 @@ from Expression import *
 from Lexer import Token, TokenType
 
 """
-This file implements a parser for SML with anonymous functions and type
-annotations. The grammar is as follows:
+Precedence table:
+    1: not ~ ()
+    2: *   /
+    3: +   -
+    4: <   <=   >=   >
+    5: =
+    6: and
+    7: or
+    8: if-then-else
 
-fn_exp  ::= fn <var>: types => fn_exp
-          | if_exp
-if_exp  ::= <if> if_exp <then> fn_exp <else> fn_exp
-          | or_exp
-or_exp  ::= and_exp (or and_exp)*
-and_exp ::= eq_exp (and eq_exp)*
-eq_exp  ::= cmp_exp (= cmp_exp)*
-cmp_exp ::= add_exp ([<=|<] add_exp)*
-add_exp ::= mul_exp ([+|-] mul_exp)*
-mul_exp ::= unary_exp ([*|/] unary_exp)*
-unary_exp ::= <not> unary_exp
-             | ~ unary_exp
-             | let_exp
-let_exp ::= <let> <var>: types <- fn_exp <in> fn_exp <end>
-          | val_exp
-val_exp ::= val_tk (val_tk)*
-val_tk ::= <var> | ( fn_exp ) | <num> | <true> | <false>
-
-types ::= type -> types | type
-
-type ::= int | bool | ( types )
+Notice that not 2 < 3 must be a type error, as we are trying to apply a boolean
+operation (not) onto a number. However, in assembly code this program works,
+because not 2 is 0. The bottom line is: don't worry about programs like this
+one: the would have been ruled out by type verification anyway.
 
 References:
     see https://www.engr.mun.ca/~theo/Misc/exp_parsing.htm#classic
@@ -60,222 +50,51 @@ class Parser:
         return self.tokens[self.cur_token_idx]
 
     def parse(self):
-        """
-        Returns the expression associated with the stream of tokens.
+        return self.IfExp()
 
-        Examples:
-        >>> parser = Parser([Token('123', TokenType.NUM)])
-        >>> g = GenVisitor()
-        >>> p = AsmModule.Program({}, [])
-        >>> exp = parser.parse()
-        >>> v = exp.accept(g, p)
-        >>> p.eval()
-        >>> p.get_val(v)
-        123
-
-        >>> parser = Parser([Token('True', TokenType.TRU)])
-        >>> g = GenVisitor()
-        >>> p = AsmModule.Program({}, [])
-        >>> exp = parser.parse()
-        >>> v = exp.accept(g, p)
-        >>> p.eval()
-        >>> p.get_val(v)
-        1
-
-        >>> parser = Parser([Token('False', TokenType.FLS)])
-        >>> g = GenVisitor()
-        >>> p = AsmModule.Program({}, [])
-        >>> exp = parser.parse()
-        >>> v = exp.accept(g, p)
-        >>> p.eval()
-        >>> p.get_val(v)
-        0
-
-        >>> tk0 = Token('~', TokenType.NEG)
-        >>> tk1 = Token('123', TokenType.NUM)
-        >>> parser = Parser([tk0, tk1])
-        >>> g = GenVisitor()
-        >>> p = AsmModule.Program({}, [])
-        >>> exp = parser.parse()
-        >>> v = exp.accept(g, p)
-        >>> p.eval()
-        >>> p.get_val(v)
-        -123
-
-        >>> tk0 = Token('3', TokenType.NUM)
-        >>> tk1 = Token('*', TokenType.MUL)
-        >>> tk2 = Token('4', TokenType.NUM)
-        >>> parser = Parser([tk0, tk1, tk2])
-        >>> g = GenVisitor()
-        >>> p = AsmModule.Program({}, [])
-        >>> exp = parser.parse()
-        >>> v = exp.accept(g, p)
-        >>> p.eval()
-        >>> p.get_val(v)
-        12
-
-        >>> tk0 = Token('3', TokenType.NUM)
-        >>> tk1 = Token('*', TokenType.MUL)
-        >>> tk2 = Token('~', TokenType.NEG)
-        >>> tk3 = Token('4', TokenType.NUM)
-        >>> parser = Parser([tk0, tk1, tk2, tk3])
-        >>> g = GenVisitor()
-        >>> p = AsmModule.Program({}, [])
-        >>> exp = parser.parse()
-        >>> v = exp.accept(g, p)
-        >>> p.eval()
-        >>> p.get_val(v)
-        -12
-
-        >>> tk0 = Token('30', TokenType.NUM)
-        >>> tk1 = Token('/', TokenType.DIV)
-        >>> tk2 = Token('4', TokenType.NUM)
-        >>> parser = Parser([tk0, tk1, tk2])
-        >>> g = GenVisitor()
-        >>> p = AsmModule.Program({}, [])
-        >>> exp = parser.parse()
-        >>> v = exp.accept(g, p)
-        >>> p.eval()
-        >>> p.get_val(v)
-        7
-
-        >>> tk0 = Token('3', TokenType.NUM)
-        >>> tk1 = Token('+', TokenType.ADD)
-        >>> tk2 = Token('4', TokenType.NUM)
-        >>> parser = Parser([tk0, tk1, tk2])
-        >>> g = GenVisitor()
-        >>> p = AsmModule.Program({}, [])
-        >>> exp = parser.parse()
-        >>> v = exp.accept(g, p)
-        >>> p.eval()
-        >>> p.get_val(v)
-        7
-
-        >>> tk0 = Token('30', TokenType.NUM)
-        >>> tk1 = Token('-', TokenType.SUB)
-        >>> tk2 = Token('4', TokenType.NUM)
-        >>> parser = Parser([tk0, tk1, tk2])
-        >>> g = GenVisitor()
-        >>> p = AsmModule.Program({}, [])
-        >>> exp = parser.parse()
-        >>> v = exp.accept(g, p)
-        >>> p.eval()
-        >>> p.get_val(v)
-        26
-
-        >>> tk0 = Token('2', TokenType.NUM)
-        >>> tk1 = Token('*', TokenType.MUL)
-        >>> tk2 = Token('(', TokenType.LPR)
-        >>> tk3 = Token('3', TokenType.NUM)
-        >>> tk4 = Token('+', TokenType.ADD)
-        >>> tk5 = Token('4', TokenType.NUM)
-        >>> tk6 = Token(')', TokenType.RPR)
-        >>> parser = Parser([tk0, tk1, tk2, tk3, tk4, tk5, tk6])
-        >>> g = GenVisitor()
-        >>> p = AsmModule.Program({}, [])
-        >>> exp = parser.parse()
-        >>> v = exp.accept(g, p)
-        >>> p.eval()
-        >>> p.get_val(v)
-        14
-
-        >>> tk0 = Token('4', TokenType.NUM)
-        >>> tk1 = Token('==', TokenType.EQL)
-        >>> tk2 = Token('4', TokenType.NUM)
-        >>> parser = Parser([tk0, tk1, tk2])
-        >>> g = GenVisitor()
-        >>> p = AsmModule.Program({}, [])
-        >>> exp = parser.parse()
-        >>> v = exp.accept(g, p)
-        >>> p.eval()
-        >>> p.get_val(v)
-        1
-
-        >>> tk0 = Token('4', TokenType.NUM)
-        >>> tk1 = Token('<=', TokenType.LEQ)
-        >>> tk2 = Token('4', TokenType.NUM)
-        >>> parser = Parser([tk0, tk1, tk2])
-        >>> g = GenVisitor()
-        >>> p = AsmModule.Program({}, [])
-        >>> exp = parser.parse()
-        >>> v = exp.accept(g, p)
-        >>> p.eval()
-        >>> p.get_val(v)
-        1
-
-        >>> tk0 = Token('4', TokenType.NUM)
-        >>> tk1 = Token('<', TokenType.LTH)
-        >>> tk2 = Token('4', TokenType.NUM)
-        >>> parser = Parser([tk0, tk1, tk2])
-        >>> g = GenVisitor()
-        >>> p = AsmModule.Program({}, [])
-        >>> exp = parser.parse()
-        >>> v = exp.accept(g, p)
-        >>> p.eval()
-        >>> p.get_val(v)
-        0
-
-        >>> tk0 = Token('not', TokenType.NOT)
-        >>> tk1 = Token('4', TokenType.NUM)
-        >>> tk2 = Token('<', TokenType.LTH)
-        >>> tk3 = Token('4', TokenType.NUM)
-        >>> parser = Parser([tk0, tk1, tk2, tk3])
-        >>> g = GenVisitor()
-        >>> p = AsmModule.Program({}, [])
-        >>> exp = parser.parse()
-        >>> v = exp.accept(g, p)
-        >>> p.eval()
-        >>> p.get_val(v)
-        1
-
-        >>> tk0 = Token('let', TokenType.LET)
-        >>> tk1 = Token('v', TokenType.VAR)
-        >>> tk2 = Token('<-', TokenType.ASN)
-        >>> tk3 = Token('42', TokenType.NUM)
-        >>> tk4 = Token('in', TokenType.INX)
-        >>> tk5 = Token('v', TokenType.VAR)
-        >>> tk6 = Token('end', TokenType.END)
-        >>> parser = Parser([tk0, tk1, tk2, tk3, tk4, tk5, tk6])
-        >>> g = GenVisitor()
-        >>> p = AsmModule.Program({}, [])
-        >>> exp = parser.parse()
-        >>> v = exp.accept(g, p)
-        >>> p.eval()
-        >>> p.get_val(v)
-        42
-
-        >>> tk0 = Token('let', TokenType.LET)
-        >>> tk1 = Token('v', TokenType.VAR)
-        >>> tk2 = Token('<-', TokenType.ASN)
-        >>> tk3 = Token('21', TokenType.NUM)
-        >>> tk4 = Token('in', TokenType.INX)
-        >>> tk5 = Token('v', TokenType.VAR)
-        >>> tk6 = Token('+', TokenType.ADD)
-        >>> tk7 = Token('v', TokenType.VAR)
-        >>> tk8 = Token('end', TokenType.END)
-        >>> parser = Parser([tk0, tk1, tk2, tk3, tk4, tk5, tk6, tk7, tk8])
-        >>> g = GenVisitor()
-        >>> p = AsmModule.Program({}, [])
-        >>> exp = parser.parse()
-        >>> v = exp.accept(g, p)
-        >>> p.eval()
-        >>> p.get_val(v)
-        42
-        """
-
-        return self.Exp()
-
-    def Exp(self):
-        return self.Not()
-
-    def Not(self):
+    def IfExp(self):
         token = self.current_token
-        if token.kind == TokenType.NOT:
-            self.consumeToken(TokenType.NOT)
-            exp = self.B()
-            return Not(exp)
+        if token.kind == TokenType.IFX:
+            self.consumeToken(TokenType.IFX)
+            cond_exp = self.IfExp()
+            token = self.current_token
+            if token.kind != TokenType.THN:
+                raise ValueError("Expressão if sem then")
+            self.consumeToken(TokenType.THN)
+            then_exp = self.IfExp()
+            token = self.current_token
+            if token.kind != TokenType.ELS:
+                raise ValueError("Expressão if sem else")
+            self.consumeToken(TokenType.ELS)
+            else_exp = self.IfExp()
+            return IfThenElse(cond_exp, then_exp, else_exp)
+        return self.Or()
 
-        return self.B()
+    def Or(self):
+        exp = self.And()
+        return self.OrExp(exp)
+
+    def OrExp(self, left):
+        token = self.current_token
+        if token.kind == TokenType.ORX:
+            self.consumeToken(TokenType.ORX)
+            right = self.And()
+            return self.OrExp(Or(left, right))
+
+        return left
+
+    def And(self):
+        exp = self.B()
+        return self.AndExp(exp)
+
+    def AndExp(self, left):
+        token = self.current_token
+        if token.kind == TokenType.AND:
+            self.consumeToken(TokenType.AND)
+            right = self.B()
+            return self.AndExp(And(left, right))
+
+        return left
 
     def B(self):
         exp = self.P()
@@ -352,12 +171,33 @@ class Parser:
 
         elif token.kind == TokenType.NEG:
             self.consumeToken(TokenType.NEG)
+            next_token = self.current_token
+            if not (next_token.kind == TokenType.TRU
+                    or next_token.kind == TokenType.FLS
+                    or next_token.kind == TokenType.VAR
+                    or next_token.kind == TokenType.NUM
+                    or next_token.kind == TokenType.LPR
+                    or next_token.kind == TokenType.LET):
+                sys.exit("Parse error")
             node = self.F()
             return Neg(node)
 
+        elif token.kind == TokenType.NOT:
+            self.consumeToken(TokenType.NOT)
+            next_token = self.current_token
+            if not (next_token.kind == TokenType.TRU
+                    or next_token.kind == TokenType.FLS
+                    or next_token.kind == TokenType.VAR
+                    or next_token.kind == TokenType.NUM
+                    or next_token.kind == TokenType.LPR
+                    or next_token.kind == TokenType.LET):
+                sys.exit("Parse error")
+            node = self.F()
+            return Not(node)
+
         elif token.kind == TokenType.LPR:  # '('
             self.consumeToken(TokenType.LPR)
-            node = self.Exp()
+            node = self.IfExp()
             self.consumeToken(TokenType.RPR)  # ')'
             return node
 
@@ -372,12 +212,12 @@ class Parser:
             if token.kind != TokenType.ASN:
                 raise ValueError("Variável sem símbolo de assign")
             self.consumeToken(TokenType.ASN)
-            e0 = self.Exp()
+            e0 = self.IfExp()
             token = self.current_token
             if token.kind != TokenType.INX:
                 raise ValueError("Bloco let sem in")
             self.consumeToken(TokenType.INX)
-            e1 = self.Exp()
+            e1 = self.IfExp()
             token = self.current_token
             if token.kind != TokenType.END:
                 raise ValueError("Bloco let sem end")
