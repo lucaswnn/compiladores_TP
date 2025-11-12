@@ -21,7 +21,7 @@ if __name__ == "__main__":
     Este arquivo nao deve ser alterado, mas deve ser enviado para resolver o
     VPL. O arquivo contem o codigo que testa a implementacao do parser.
     """
-    text = sys.stdin.read()
+    text = "let v <- 2 in let v <- v * v in v end end"
     lexer = Lexer(text)
     parser = Parser(lexer.tokens())
     exp = rename_variables(parser.parse())

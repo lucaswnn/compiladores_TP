@@ -25,29 +25,34 @@ class TokenType(enum.Enum):
     These are the possible tokens. You don't need to change this class at all.
     """
     EOF = -1  # End of file
-    NLN = 0  # New line
-    WSP = 1  # White Space
-    COM = 2  # Comment
-    NUM = 3  # Number (integers)
-    STR = 4  # Strings
-    TRU = 5  # The constant true
-    FLS = 6  # The constant false
-    VAR = 7  # An identifier
-    LET = 8  # The 'let' of the let expression
-    INX = 9  # The 'in' of the let expression
+    NLN = 0   # New line
+    WSP = 1   # White Space
+    COM = 2   # Comment
+    NUM = 3   # Number (integers)
+    STR = 4   # Strings
+    TRU = 5   # The constant true
+    FLS = 6   # The constant false
+    VAR = 7   # An identifier
+    LET = 8   # The 'let' of the let expression
+    INX = 9   # The 'in' of the let expression
     END = 10  # The 'end' of the let expression
-    EQL = 201
-    ADD = 202
-    SUB = 203
-    MUL = 204
-    DIV = 205
-    LEQ = 206
-    LTH = 207
-    NEG = 208
-    NOT = 209
-    LPR = 210
-    RPR = 211
+    EQL = 201  # x = y
+    ADD = 202  # x + y
+    SUB = 203  # x - y
+    MUL = 204  # x * y
+    DIV = 205  # x / y
+    LEQ = 206  # x <= y
+    LTH = 207  # x < y
+    NEG = 208  # ~x
+    NOT = 209  # not x
+    LPR = 210  # (
+    RPR = 211  # )
     ASN = 212  # The assignment '<-' operator
+    ORX = 213  # x or y
+    AND = 214  # x and y
+    IFX = 215  # The 'if' of a conditional expression
+    THN = 216  # The 'then' of a conditional expression
+    ELS = 217  # The 'else' of a conditional expression
 
 
 class Lexer:
@@ -1551,10 +1556,7 @@ class Lexer:
     def tokens(self):
         """
         This method is a token generator: it converts the string encapsulated
-        into this object into a sequence of Tokens. Notice that this method
-        filters out three kinds of tokens: white-spaces, comments and new lines.
-
-        Examples:
+        into this object into a sequence of Tokens. Examples:
 
         >>> l = Lexer("1 + 3")
         >>> [tk.kind for tk in l.tokens()]
