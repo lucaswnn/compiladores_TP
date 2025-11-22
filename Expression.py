@@ -230,3 +230,33 @@ class IfThenElse(Expression):
 
     def accept(self, visitor, arg):
         return visitor.visit_ifThenElse(self, arg)
+
+
+class Fn(Expression):
+    """
+    This class represents an anonymous function.
+    """
+
+    def __init__(self, formal, body):
+        self.formal = formal
+        self.body = body
+
+    def accept(self, visitor, arg):
+        return visitor.visit_fn(self, arg)
+
+
+class App(Expression):
+    """
+    This class represents a function application, such as 'e0 e1'. The semantics
+    of an application is as follows: we evaluate the left side, e.g., e0. It
+    must result into a function fn(p, b) denoting a function that takes in a
+    parameter p and evaluates a body b. We then evaluates e1, to obtain a value
+    v. Finally, we evaluate b, but in a context where p is bound to v.
+    """
+
+    def __init__(self, function, actual):
+        self.function = function
+        self.actual = actual
+
+    def accept(self, visitor, arg):
+        return visitor.visit_app(self, arg)
