@@ -24,17 +24,18 @@ class TokenType(enum.Enum):
     """
     These are the possible tokens. You don't need to change this class at all.
     """
+
     EOF = -1  # End of file
-    NLN = 0   # New line
-    WSP = 1   # White Space
-    COM = 2   # Comment
-    NUM = 3   # Number (integers)
-    STR = 4   # Strings
-    TRU = 5   # The constant true
-    FLS = 6   # The constant false
-    VAR = 7   # An identifier
-    LET = 8   # The 'let' of the let expression
-    INX = 9   # The 'in' of the let expression
+    NLN = 0  # New line
+    WSP = 1  # White Space
+    COM = 2  # Comment
+    NUM = 3  # Number (integers)
+    STR = 4  # Strings
+    TRU = 5  # The constant true
+    FLS = 6  # The constant false
+    VAR = 7  # An identifier
+    LET = 8  # The 'let' of the let expression
+    INX = 9  # The 'in' of the let expression
     END = 10  # The 'end' of the let expression
     EQL = 201  # x = y
     ADD = 202  # x + y
@@ -53,6 +54,8 @@ class TokenType(enum.Enum):
     IFX = 215  # The 'if' of a conditional expression
     THN = 216  # The 'then' of a conditional expression
     ELS = 217  # The 'else' of a conditional expression
+    FNX = 218  # The 'fn' that declares an anonymous function
+    ARW = 219  # The '=>' that separates the parameter from the body of function
 
 
 class Lexer:
@@ -1556,11 +1559,18 @@ class Lexer:
     def tokens(self):
         """
         This method is a token generator: it converts the string encapsulated
-        into this object into a sequence of Tokens. Examples:
+        into this object into a sequence of Tokens. Notice that this method
+        filters out three kinds of tokens: white-spaces, comments and new lines.
+
+        Examples:
 
         >>> l = Lexer("1 + 3")
         >>> [tk.kind for tk in l.tokens()]
         [<TokenType.NUM: 3>, <TokenType.ADD: 202>, <TokenType.NUM: 3>]
+
+        >>> l = Lexer('1 * 2\\n')
+        >>> [tk.kind for tk in l.tokens()]
+        [<TokenType.NUM: 3>, <TokenType.MUL: 204>, <TokenType.NUM: 3>]
 
         >>> l = Lexer('1 * 2 -- 3\\n')
         >>> [tk.kind for tk in l.tokens()]

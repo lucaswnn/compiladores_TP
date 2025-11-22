@@ -77,6 +77,14 @@ class Visitor(ABC):
     def visit_ifThenElse(self, exp, arg):
         pass
 
+    @abstractmethod
+    def visit_fn(self, exp, arg):
+        pass
+
+    @abstractmethod
+    def visit_app(self, exp, arg):
+        pass
+
 
 class GenVisitor(Visitor):
     """
@@ -617,9 +625,7 @@ class GenVisitor(Visitor):
         """
         exp_def_name = exp.exp_def.accept(self, prog)
         prog.add_inst(AsmModule.Add(exp.identifier, exp_def_name, "x0"))
-
         exp_body_name = exp.exp_body.accept(self, prog)
-
         return exp_body_name
 
     def visit_ifThenElse(self, exp, prog):
@@ -690,6 +696,40 @@ class GenVisitor(Visitor):
         n_inst = prog.get_number_of_instructions()
         end.set_target(n_inst)
         return r
+
+    def visit_fn(self, exp, prog):
+        addr_var = self.next_var_name()
+        func_addr = prog.get_number_of_instructions()+2
+        prog.add_inst(AsmModule.Addi(addr_var, "x0", func_addr))
+
+        func_after = AsmModule.Jal("x0")
+        prog.add_inst(func_after)
+
+        prog.add_inst(AsmModule.Addi("sp", "sp", -4))
+        prog.add_inst(AsmModule.Sw("sp", 0, "ra"))
+
+        prog.add_inst(AsmModule.Add(exp.formal, "a0", "x0"))
+
+        return_var = exp.body.accept(self, prog)
+        prog.add_inst(AsmModule.Add("a0", return_var, "x0"))
+
+        prog.add_inst(AsmModule.Lw("sp", 0, "ra"))
+        prog.add_inst(AsmModule.Addi("sp", "sp", 4))
+
+        prog.add_inst(AsmModule.Jalr("x0", "ra"))
+
+        func_after.set_target(prog.get_number_of_instructions())
+
+        return addr_var
+
+    def visit_app(self, exp, prog):
+        func_label = exp.function.accept(self, prog)
+        param_value = exp.actual.accept(self, prog)
+        prog.add_inst(AsmModule.Add("a0", param_value, "x0"))
+        prog.add_inst(AsmModule.Jalr("ra", func_label))
+        ret_var = self.next_var_name()
+        prog.add_inst(AsmModule.Add(ret_var, "a0", "x0"))
+        return ret_var
 
 
 class RenameVisitor(ABC):
@@ -889,10 +929,36 @@ class RenameVisitor(ABC):
         self.pop_variable(exp.identifier, arg)
         exp.identifier = unique_name
 
+    def visit_fn(self, exp, name_map):
+        """
+        >>> e0 = Fn('v', Mul(Var('v'), Var('v')))
+        >>> e1 = Let('v', e0, Var('v'))
+        >>> e1.accept(RenameVisitor(), {})
+        >>> e0.formal != e1.identifier
+        True
 
-if __name__ == "__main__":
-    e0 = Let('x', Num(2), Add(Var('x'), Num(3)))
-    e1 = Let('x', e0, Mul(Var('x'), Num(10)))
-    r = RenameVisitor()
-    e1.accept(r, {})
-    e0.identifier == e1.identifier
+        >>> x0 = Var('v')
+        >>> x1 = Var('v')
+        >>> x2 = Var('v')
+        >>> e0 = Fn('v', Mul(x0, x2))
+        >>> e1 = Let('v', e0, x1)
+        >>> e1.accept(RenameVisitor(), {})
+        >>> x0.identifier != x1.identifier and x0.identifier == x2.identifier
+        True
+        """
+        # unique_name = self.generate_unique_name(exp.formal, name_map)
+        exp.body.accept(self, name_map)
+        # self.pop_variable(exp.formal, name_map)
+
+    def visit_app(self, exp, name_map):
+        """
+        >>> x0 = Var('x')
+        >>> x1 = Var('x')
+        >>> x2 = Var('x')
+        >>> e = Let('x', Fn('x', Add(x0, Num(1))), App(x1, x2))
+        >>> e.accept(RenameVisitor(), {})
+        >>> x0.identifier != x1.identifier and x1.identifier == x2.identifier
+        True
+        """
+        exp.function.accept(self, name_map)
+        exp.actual.accept(self, name_map)

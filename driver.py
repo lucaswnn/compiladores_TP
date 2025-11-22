@@ -21,12 +21,23 @@ if __name__ == "__main__":
     Este arquivo nao deve ser alterado, mas deve ser enviado para resolver o
     VPL. O arquivo contem o codigo que testa a implementacao do parser.
     """
-    text = "let v <- 2 in let v <- v * v in v end end"
+    text = """
+            let
+                sqr <- fn x => x * x
+            in
+                let
+                    twice <- fn a => fn b => a (a b)
+                in
+                    (twice sqr) 3
+                end
+            end
+            """  # sys.stdin.read()
     lexer = Lexer(text)
     parser = Parser(lexer.tokens())
     exp = rename_variables(parser.parse())
-    prog = AsmModule.Program({}, [])
+    prog = AsmModule.Program(memory_size=1000, env={}, insts=[])
     gen = GenVisitor()
     var_answer = exp.accept(gen, prog)
+    prog.print_insts()
     prog.eval()
     print(f"Answer: {prog.get_val(var_answer)}")
