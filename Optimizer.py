@@ -83,10 +83,11 @@ class RegAllocator(Optimizer):
         if self.reg_map[reg] is None:
             raise Exception("Register not found")
 
+        val = self.reg_map[reg]
         self.mem_ptr += 1
         mem_addr = self.mem_ptr
         val = self.reg_map[reg]
-        self.val_map[mem_addr] = val
+        self.val_map[val] = mem_addr
         self.reg_map[reg] = None
         return mem_addr
 
@@ -105,7 +106,7 @@ class RegAllocator(Optimizer):
         if self.are_regs_busy():
             reg = self.get_reg_victim()
             addr = self.alloc_next_mem(reg)
-            insts.append(Sw(reg, addr, "x0"))
+            insts.append(Sw("x0", addr, reg))
 
     def ensure_var_in_reg(self, var, insts):
         val_loc = self.get_var_loc(var)
@@ -117,7 +118,7 @@ class RegAllocator(Optimizer):
                 insts.append(Sw(reg, addr, "x0"))
 
             reg = self.alloc_next_reg(var)
-            insts.append(Lw(reg, val_loc, "x0"))
+            insts.append(Lw("x0", val_loc, reg))
         elif val_loc is None:
             reg = "x0"
         else:
@@ -131,7 +132,7 @@ class RegAllocator(Optimizer):
         reg_rs1 = self.ensure_var_in_reg(inst.rs1, new_insts)
         new_insts.append(Addi(reg_rd, reg_rs1, inst.imm))
         return new_insts
-    
+
     def alloc_xori(self, inst):
         new_insts = []
         self.ensure_rd_reg(new_insts)
