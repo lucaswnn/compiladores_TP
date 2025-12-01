@@ -190,6 +190,7 @@ class GenVisitor(Visitor):
     """
 
     def __init__(self):
+        self.var_set = set()
         self.next_var_counter = 0
 
     def next_var_name(self):
@@ -207,8 +208,8 @@ class GenVisitor(Visitor):
             >>> p.get_val(v)
             1
         """
-        if exp.identifier not in prog.env:
-            raise Exception(f"Variable {exp.identifier} not found in env.")
+        if exp.identifier not in self.var_set:
+            sys.exit(f"Variavel inexistente {exp.identifier}")
         return exp.identifier
 
     def visit_bln(self, exp, prog):
@@ -601,8 +602,74 @@ class GenVisitor(Visitor):
             50
         """
         exp_def_name = exp.exp_def.accept(self, prog)
+        self.var_set = self.var_set | {exp.identifier}
         prog.add_inst(AsmModule.Add(exp.identifier, exp_def_name, "x0"))
-
         exp_body_name = exp.exp_body.accept(self, prog)
-
         return exp_body_name
+
+
+class EvalVisitor(Visitor):
+    """
+    The EvalVisitor class evaluates logical and arithmetic expressions. The
+    result of evaluating an expression is the value of that expression. The
+    inherited attribute propagated throughout visits is the environment that
+    associates the names of variables with values.
+
+    Examples:
+    >>> e0 = Let('v', Add(Num(40), Num(2)), Mul(Var('v'), Var('v')))
+    >>> e1 = Not(Eql(e0, Num(1764)))
+    >>> ev = EvalVisitor()
+    >>> e1.accept(ev, {})
+    False
+
+    >>> e0 = Let('v', Add(Num(40), Num(2)), Sub(Var('v'), Num(2)))
+    >>> e1 = Lth(e0, Var('x'))
+    >>> ev = EvalVisitor()
+    >>> e1.accept(ev, {'x': 41})
+    True
+    """
+
+    def visit_var(self, exp, env):
+        if exp.identifier in env:
+            return env[exp.identifier]
+
+        sys.exit(f"Variavel inexistente {exp.identifier}.")
+
+    def visit_bln(self, exp, env):
+        return exp.bln
+
+    def visit_num(self, exp, env):
+        return exp.num
+
+    def visit_eql(self, exp, env):
+        return exp.left.accept(self, env) == exp.right.accept(self, env)
+
+    def visit_add(self, exp, env):
+        return exp.left.accept(self, env) + exp.right.accept(self, env)
+
+    def visit_sub(self, exp, env):
+        return exp.left.accept(self, env) - exp.right.accept(self, env)
+
+    def visit_mul(self, exp, env):
+        return exp.left.accept(self, env) * exp.right.accept(self, env)
+
+    def visit_div(self, exp, env):
+        return exp.left.accept(self, env) // exp.right.accept(self, env)
+
+    def visit_leq(self, exp, env):
+        return exp.left.accept(self, env) <= exp.right.accept(self, env)
+
+    def visit_lth(self, exp, env):
+        return exp.left.accept(self, env) < exp.right.accept(self, env)
+
+    def visit_neg(self, exp, env):
+        return -exp.exp.accept(self, env)
+
+    def visit_not(self, exp, env):
+        return not exp.exp.accept(self, env)
+
+    def visit_let(self, exp, env):
+        e0_val = exp.exp_def.accept(self, env)
+        new_env = dict(env)
+        new_env[exp.identifier] = e0_val
+        return exp.exp_body.accept(self, new_env)

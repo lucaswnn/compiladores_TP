@@ -38,7 +38,7 @@ if __name__ == "__main__":
     Este arquivo nao deve ser alterado, mas deve ser enviado para resolver o
     VPL. O arquivo contem o codigo que testa a implementacao do parser.
     """
-    text = "1 + a"#sys.stdin.read()
+    text = "true = (not (2 < 3 = true))"  # sys.stdin.read()
     lexer = Lexer(text)
     parser = Parser(lexer.tokens())
     exp = rename_variables(parser.parse())
