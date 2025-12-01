@@ -1515,7 +1515,8 @@ class Lexer:
     def state_variable(self):
         self_state = "state_variable"
         cur_char = self.getChar()
-        if cur_char not in Lexer.var_characters:
+
+        if (cur_char is None) or (cur_char not in Lexer.var_characters):
             return self_state, "else", None
 
         self.consumeChar()
